@@ -11,4 +11,9 @@ if (!$savienojums) {
 }
 
 mysqli_set_charset($savienojums, "utf8");
+
+// Helper function
+function escape($savienojums, $val) {
+    return mysqli_real_escape_string($savienojums, $val);
+}
 ?>

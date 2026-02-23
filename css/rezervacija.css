@@ -1,0 +1,32 @@
+/* Rezervācija Page */
+.rezervacija-section { padding: 80px 64px; background: var(--cream); }
+.rezervacija-grid { display: grid; grid-template-columns: 420px 1fr; gap: 60px; align-items: start; }
+
+.cal-card { background: var(--white); padding: 36px; border: 1px solid var(--grey3); }
+.info-card { background: var(--white); padding: 36px; border: 1px solid var(--grey3); margin-top: 20px; }
+
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.cal-nav { background: none; border: 1px solid var(--grey3); color: var(--gold); cursor: pointer; font-size: 15px; padding: 6px 12px; transition: all .2s; }
+.cal-nav:hover { background: var(--gold); color: var(--white); border-color: var(--gold); }
+.cal-month { font-family: 'Cormorant Garamond', serif; font-size: 19px; color: var(--ink); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+.cal-day { text-align: center; padding: 9px 4px; font-size: 12px; cursor: pointer; transition: all .2s; color: var(--ink2); border-radius: 0; }
+.cal-day.available:hover { background: var(--gold-dim); color: var(--gold); }
+.cal-day.booked { color: var(--grey3); cursor: not-allowed; text-decoration: line-through; }
+.cal-day.selected { background: var(--gold); color: var(--white); font-weight: 600; }
+.cal-day.today { border: 1px solid var(--gold-border); }
+.cal-day-name { text-align: center; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--grey2); padding: 6px 0; }
+#selectedDateInfo { font-size: 11px; color: var(--gold); letter-spacing: 2px; text-transform: uppercase; margin: 13px 0; min-height: 17px; }
+
+.price-list { margin-top: 16px; }
+.price-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--grey3); font-size: 13px; color: var(--grey); }
+.price-item:last-child { border-bottom: none; }
+.price { font-weight: 600; color: var(--gold); }
+
+.rezervacija-right { background: var(--white); padding: 52px; border: 1px solid var(--grey3); }
+
+@media(max-width:900px) {
+  .rezervacija-section { padding: 60px 22px; }
+  .rezervacija-grid { grid-template-columns: 1fr; gap: 30px; }
+  .rezervacija-right { padding: 30px 22px; }
+}

@@ -1,0 +1,27 @@
+/* Pakalpojumi Page */
+.pakalpojumi-section { padding: 80px 64px; background: var(--white); }
+
+.service-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; padding: 80px 0; border-bottom: 1px solid var(--grey3); }
+.service-detail:last-child { border-bottom: none; }
+.service-detail.reverse { direction: rtl; }
+.service-detail.reverse > * { direction: ltr; }
+
+.service-detail-img { position: relative; }
+.service-detail-img img { width: 100%; height: 500px; object-fit: cover; display: block; }
+.service-detail-badge { position: absolute; bottom: -16px; left: 32px; background: var(--gold); color: var(--white); padding: 12px 22px; font-family: 'Cormorant Garamond',serif; font-size: 20px; font-weight: 400; }
+
+.service-detail-content p { font-size: 14px; line-height: 1.9; color: var(--grey); margin-bottom: 16px; }
+.service-detail-content .section-title { margin: 10px 0 24px; }
+
+.service-includes { margin-top: 24px; }
+.service-include { font-size: 13px; color: var(--ink2); padding: 8px 0; border-bottom: 1px solid var(--grey3); letter-spacing: .5px; }
+.service-include:last-child { border-bottom: none; }
+
+.pakalpojumi-cta { padding: 100px 64px; text-align: center; background: var(--cream2); border-top: 1px solid var(--grey3); }
+
+@media(max-width:900px) {
+  .pakalpojumi-section { padding: 60px 22px; }
+  .service-detail { grid-template-columns: 1fr; gap: 40px; }
+  .service-detail.reverse { direction: ltr; }
+  .pakalpojumi-cta { padding: 60px 22px; }
+}

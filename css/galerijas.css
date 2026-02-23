@@ -1,0 +1,23 @@
+/* Galerijas Page */
+.galerijas-section { padding: 80px 64px; min-height: 50vh; }
+
+.galerijas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+.galerija-card { background: var(--white); border: 1px solid var(--grey3); cursor: pointer; transition: all .3s; overflow: hidden; }
+.galerija-card:hover { box-shadow: 0 12px 40px var(--shadow2); transform: translateY(-4px); border-color: var(--gold-border); }
+
+.galerija-thumb { height: 220px; background: var(--cream2); position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.galerija-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.galerija-placeholder { font-size: 52px; opacity: .2; }
+.galerija-count { position: absolute; top: 14px; right: 14px; background: var(--ink); color: var(--white); padding: 4px 12px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+
+.galerija-info { padding: 24px; }
+.galerija-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: var(--ink); margin-bottom: 8px; }
+.galerija-meta { font-size: 12px; color: var(--grey); line-height: 1.6; margin-bottom: 16px; }
+.galerija-dates { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--grey2); }
+.galerija-link { color: var(--gold); font-weight: 600; letter-spacing: 1px; }
+
+@media(max-width:900px) {
+  .galerijas-section { padding: 60px 22px; }
+  .galerijas-grid { grid-template-columns: 1fr; }
+}

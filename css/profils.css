@@ -1,0 +1,27 @@
+/* Profils Page */
+.profils-header { background: var(--white); border-bottom: 1px solid var(--grey3); padding: 40px 64px; }
+.profils-header-inner { display: flex; align-items: center; gap: 24px; max-width: 1100px; margin: 0 auto; }
+.profils-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond',serif; font-size: 28px; color: var(--white); flex-shrink: 0; }
+
+.profils-tabs-wrap { background: var(--white); border-bottom: 1px solid var(--grey3); position: sticky; top: 80px; z-index: 50; }
+.profils-tabs { display: flex; max-width: 1100px; margin: 0 auto; padding: 0 64px; }
+.profils-tab { padding: 16px 24px; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--grey); text-decoration: none; border-bottom: 2px solid transparent; transition: all .3s; }
+.profils-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.profils-tab:hover { color: var(--ink); }
+
+.profils-content { max-width: 1100px; margin: 0 auto; padding: 52px 64px; }
+
+.rezervacija-row { display: grid; grid-template-columns: 70px 1fr auto auto; gap: 24px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--grey3); }
+.rez-date { text-align: center; }
+
+.galerija-preview-card { border: 1px solid var(--grey3); overflow: hidden; transition: all .3s; display: block; }
+.galerija-preview-card:hover { border-color: var(--gold-border); box-shadow: 0 8px 30px var(--shadow); transform: translateY(-3px); }
+.galerija-preview-card > div:last-child { padding: 20px; }
+
+@media(max-width:900px) {
+  .profils-header { padding: 30px 22px; }
+  .profils-header-inner { flex-wrap: wrap; }
+  .profils-tabs { padding: 0 22px; overflow-x: auto; }
+  .profils-content { padding: 40px 22px; }
+  .rezervacija-row { grid-template-columns: 60px 1fr auto; }
+}
