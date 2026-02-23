@@ -23,7 +23,7 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 <nav id="nav">
   <a href="/4pt/blazkova/lumina/Lumina/index.php" class="logo">LUMIN<span>A</span></a>
   <ul class="nav-links">
-    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php" <?= $currentPage === 'portfolio' ? 'class="active"' : '' ?>>Portfelis</a></li>
+    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php" <?= $currentPage === 'portfolio' ? 'class="active"' : '' ?>>Portfolio</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php" <?= $currentPage === 'pakalpojumi' ? 'class="active"' : '' ?>>Pakalpojumi</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php" <?= $currentPage === 'veikals' ? 'class="active"' : '' ?>>Veikals</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" <?= $currentPage === 'rezervacija' ? 'class="active"' : '' ?>>Rezervēt</a></li>

@@ -1,28 +1,25 @@
-# Lumina
-Mūsdienīga tīmekļa platforma fotogrāfiem, kas apvieno portfolio, rezervācijas sistēmu, tiešsaistes veikalu un klientu pārvaldību vienā risinājumā.
+# 📸 LUMINA — Profesionāla fotogrāfa digitālā platforma
 
-# 📸 LUMINA — Fotogrāfa biznesa platforma
+LUMINA ir moderna tīmekļa platforma fotogrāfiem, kas apvieno portfolio prezentāciju, rezervācijas sistēmu, tiešsaistes veikalu un klientu pārvaldību vienā integrētā risinājumā.
 
-LUMINA ir moderna tīmekļa lietotne, kas izstrādāta kā pilnvērtīga digitālā biznesa platforma profesionālam fotogrāfam.
-Sistēma apvieno portfolio demonstrēšanu, tiešsaistes veikalu, rezervācijas sistēmu un klientu pārvaldību vienā integrētā risinājumā.
-
-Projekts izstrādāts kā kvalifikācijas eksāmena darbs Liepājas Valsts tehnikumā.
+Demo:  
+https://www.kristovskis.lv/4pt/blazkova/lumina/Lumina/
 
 ---
 
-## 🚀 Projekta apraksts
+## 🚀 Par projektu
 
-Mūsdienu digitālajā laikmetā fotogrāfam nepietiek tikai ar tehniskām prasmēm un radošumu — nepieciešama arī profesionāla digitālā vide, kas ļauj efektīvi pārvaldīt klientus, pasūtījumus un rezervācijas.
+Mūsdienu fotogrāfijas biznesā nepietiek tikai ar skaistu portfolio — nepieciešama efektīva sistēma klientu apkalpošanai, rezervāciju organizēšanai un produktu pārdošanai.
 
-LUMINA nodrošina:
+LUMINA nodrošina vienotu vidi, kur klienti var:
 
-* Profesionālu portfolio prezentāciju
-* Fotogrāfiju un produktu pārdošanu tiešsaistē
-* Fotosesiju rezervācijas sistēmu
-* Klientu profilus un personalizētas galerijas
-* Administratora paneli biznesa pārvaldībai
+- apskatīt fotogrāfa darbus
+- rezervēt fotosesijas
+- iegādāties fotogrāfijas
+- pārvaldīt savus pasūtījumus
+- piekļūt personīgajām galerijām
 
-Platformas mērķis ir palīdzēt fotogrāfiem efektīvāk organizēt darbu un attīstīt savu biznesu.
+Savukārt fotogrāfs iegūst ērtu administrācijas paneli biznesa pārvaldībai.
 
 ---
 
@@ -30,40 +27,37 @@ Platformas mērķis ir palīdzēt fotogrāfiem efektīvāk organizēt darbu un a
 
 ### 👤 Lietotājiem
 
-* Reģistrācija un autorizācija
-* Personīgais profils
-* Portfolio pārlūkošana pēc kategorijām
-* Fotosesiju rezervēšana
-* Pasūtījumu veikšana
-* Rezervāciju statusa pārbaude
-* Pasūtījumu vēsture
-* Personīgo galeriju piekļuve
+- Reģistrācija un autorizācija
+- Personīgais profils
+- Portfolio galeriju pārlūkošana
+- Fotosesiju rezervācija tiešsaistē
+- Pasūtījumu veikšana
+- Rezervāciju un pasūtījumu statusa pārbaude
+- Personīgo galeriju piekļuve
 
 ### 🛍️ Tiešsaistes veikals
 
-* Preču katalogs
-* Iepirkumu grozs
-* Promo kodi
-* Piegādes metodes
-* Pasūtījumu pārvaldība
-* Maksājumu iespējas
+- Produktu katalogs
+- Iepirkumu grozs
+- Pasūtījumu noformēšana
+- Piegādes metodes
+- Maksājumu iespējas
 
 ### 📅 Rezervāciju sistēma
 
-* Pakalpojumu katalogs
-* Interaktīvs kalendārs
-* Pieejamo datumu pārbaude
-* Automātiski paziņojumi
-* Rezervāciju pārvaldība
+- Pakalpojumu izvēle
+- Pieejamības kalendārs
+- Datuma un laika rezervācija
+- Rezervāciju pārvaldība
 
 ### ⚙️ Administratora panelis
 
-* Portfolio pārvaldība
-* Produktu pārvaldība
-* Pasūtījumu apstrāde
-* Rezervāciju kalendārs
-* Klientu datu pārvaldība
-* Statistika un pārskati
+- Portfolio pārvaldība
+- Produktu rediģēšana
+- Pasūtījumu pārvaldība
+- Rezervāciju kalendārs
+- Klientu datu pārvaldība
+- Statistika
 
 ---
 
@@ -71,58 +65,57 @@ Platformas mērķis ir palīdzēt fotogrāfiem efektīvāk organizēt darbu un a
 
 Frontend:
 
-* HTML5
-* CSS3
-* JavaScript
+- HTML
+- CSS
+- JavaScript
 
 Backend:
 
-* PHP
-* MySQL
+- PHP
+- MySQL
 
 Papildu rīki:
 
-* PHPMailer
-* Git
-* phpMyAdmin
+- PHPMailer
+- Git
+- phpMyAdmin
 
 ---
 
 ## 📱 Responsīvs dizains
 
-Sistēma ir pilnībā responsīva un pielāgota:
+Platforma ir pielāgota:
 
-* 💻 datoriem
-* 📱 viedtālruņiem
-* 📲 planšetēm
+- datoriem
+- planšetēm
+- mobilajām ierīcēm
 
 ---
 
 ## 🔒 Drošība
 
-* HTTPS datu šifrēšana
-* Paroļu hashēšana (bcrypt)
-* SQL injekciju aizsardzība
-* XSS un CSRF aizsardzība
-* Droša failu augšupielāde
+- Paroļu hashēšana
+- SQL injekciju aizsardzība
+- XSS aizsardzība
+- Droša failu augšupielāde
 
 ---
 
 ## 🎯 Projekta mērķis
 
-Izstrādāt funkcionālu un vizuāli pievilcīgu tīmekļa platformu, kas apvieno vairākus fotogrāfa biznesa rīkus vienā sistēmā, nodrošinot ērtu klientu apkalpošanu un efektīvu darba pārvaldību.
+Izveidot modernu web platformu, kas palīdz fotogrāfiem efektīvi pārvaldīt klientus, pasūtījumus un rezervācijas vienā sistēmā.
 
 ---
 
 ## 👩‍💻 Autore
 
-Katrīna Blažkova
-Liepājas Valsts tehnikums
-Programmēšanas tehniķa kvalifikācijas darbs
+Katrīna Blažkova  
+Liepājas Valsts tehnikums  
+Programmēšanas tehniķa kvalifikācijas darbs  
 2026
 
 ---
 
 ## 📄 Licence
 
-Šis projekts izstrādāts izglītības nolūkiem.
+Projekts izstrādāts izglītības nolūkiem.
