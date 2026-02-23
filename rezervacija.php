@@ -1,4 +1,5 @@
 <?php
+session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
 $pageTitle = 'Rezervācija';
@@ -32,7 +33,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = mysqli_prepare($savienojums, $sql);
     mysqli_stmt_bind_param($stmt, 'isssssd', $klienta_id, $pakalpojums, $datums, $laiks, $vieta, $papildu, $cena);
     if (mysqli_stmt_execute($stmt)) {
-      $success = 'Pieteikums nosūtīts! Sazināsimies ar jums 24 stundu laikā.';
+      $success = 'Pieteikums nosūtīts! Apstiprinājums nosūtīts uz jūsu e-pastu.';
+      $klientaVards = isset($_SESSION['klients_vards']) ? $_SESSION['klients_vards'] : 'Viesis';
+      $klientaEmail = isset($_SESSION['klients_epasts']) ? $_SESSION['klients_epasts'] : '';
+      // Fetch client phone
+      $talrunis = '';
+      if (isset($_SESSION['klients_id'])) {
+        $kl = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT talrunis FROM klienti WHERE id=" . (int)$_SESSION['klients_id']));
+        $talrunis = $kl['talrunis'] ?? '';
+      }
+      $rezData = ['pakalpojums'=>$pakalpojums,'datums'=>$datums,'laiks'=>$laiks,'vieta'=>$vieta,'cena'=>$cena,'papildu_info'=>$papildu];
+      require_once __DIR__ . '/includes/mailer.php';
+      mailRezervacijaAdmin($rezData, $klientaVards, $klientaEmail, $talrunis);
+      if ($klientaEmail) mailRezervacijaKlients($klientaEmail, $klientaVards, $rezData);
     } else {
       $error = 'Kļūda: ' . mysqli_error($savienojums);
     }

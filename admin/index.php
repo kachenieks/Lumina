@@ -1,4 +1,5 @@
 <?php
+session_name('lumina_admin');
 session_start();
 require_once __DIR__ . '/../includes/db.php';
 $pageTitle = 'Pārskats';

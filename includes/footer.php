@@ -14,7 +14,7 @@
       <div class="footer-heading">Ātrās saites</div>
       <ul class="footer-links">
         <li><a href="/4pt/blazkova/lumina/Lumina/index.php">Sākums</a></li>
-        <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php">Portfolio</a></li>
+        <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php">Portfelis</a></li>
         <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php">Pakalpojumi</a></li>
         <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php">Veikals</a></li>
         <li><a href="/4pt/blazkova/lumina/Lumina/galerijas.php">Galerijas</a></li>
@@ -34,9 +34,9 @@
       <div class="footer-heading">Kontakti</div>
       <div class="footer-contact">
         📧 info@lumina.lv<br>
-        📞 +371 22 322 130<br>
-        📍 Dzintaru iela 97/99<br>
-        Liepāja, LV-3416, Latvija
+        📞 +371 20 000 000<br>
+        📍 Brīvības iela 123<br>
+        Rīga, LV-1001, Latvija
       </div>
     </div>
   </div>

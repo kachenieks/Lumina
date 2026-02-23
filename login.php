@@ -1,4 +1,5 @@
 <?php
+session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
 $pageTitle = 'Pieslēgties';
@@ -10,17 +11,17 @@ if (isset($_SESSION['klients_id'])) {
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $epasts = escape($savienojums, $_POST['epasts'] ?? '');
+  $epasts = escape($savienojums, trim($_POST['epasts'] ?? ''));
   $parole = $_POST['parole'] ?? '';
-  
-  $sql = "SELECT * FROM klienti WHERE epasts = '$epasts' LIMIT 1";
-  $result = mysqli_query($savienojums, $sql);
+
+  $result = mysqli_query($savienojums, "SELECT * FROM klienti WHERE epasts='$epasts' LIMIT 1");
   $klients = mysqli_fetch_assoc($result);
-  
+
   if ($klients && password_verify($parole, $klients['parole'])) {
-    $_SESSION['klients_id'] = $klients['id'];
+    session_regenerate_id(true); // prevent session fixation
+    $_SESSION['klients_id']    = $klients['id'];
     $_SESSION['klients_vards'] = $klients['vards'];
-    $_SESSION['klients_epasts'] = $klients['epasts'];
+    $_SESSION['klients_epasts']= $klients['epasts'];
     header('Location: /4pt/blazkova/lumina/Lumina/profils.php');
     exit;
   } else {
@@ -36,20 +37,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="section-label" style="display:block;text-align:center;">Laipni lūgti atpakaļ</div>
       <h1 style="font-family:'Cormorant Garamond',serif;font-size:46px;font-weight:300;color:var(--ink);margin-top:10px;">Pieslēgties</h1>
     </div>
-    
+
     <?php if ($error): ?>
-    <div class="alert alert-error" style="margin-bottom:20px;"><?= $error ?></div>
+    <div class="alert alert-error" style="margin-bottom:20px;"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
-    
+
     <div style="background:var(--white);padding:48px;border:1px solid var(--grey3);">
-      <form method="POST">
+      <form method="POST" autocomplete="off">
         <div class="form-group">
           <label class="form-label">E-pasta adrese</label>
-          <input type="email" name="epasts" class="form-input" placeholder="jusu@epasts.lv" required value="<?= htmlspecialchars($_POST['epasts'] ?? '') ?>">
+          <input type="email" name="epasts" class="form-input" placeholder="jusu@epasts.lv" required
+            value="<?= htmlspecialchars($_POST['epasts'] ?? '') ?>" autofocus>
         </div>
         <div class="form-group">
           <label class="form-label">Parole</label>
-          <input type="password" name="parole" class="form-input" placeholder="Ievadiet paroli" required>
+          <div style="position:relative;">
+            <input type="password" name="parole" id="paroleInput" class="form-input" placeholder="Ievadiet paroli" required style="padding-right:44px;">
+            <button type="button" onclick="togglePw('paroleInput','eyeBtn')" id="eyeBtn"
+              style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--grey);font-size:16px;">👁</button>
+          </div>
         </div>
         <button type="submit" class="btn-primary" style="width:100%;margin-top:10px;">Pieslēgties →</button>
       </form>
@@ -61,3 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+<script>
+function togglePw(inputId, btnId) {
+  const inp = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+</script>

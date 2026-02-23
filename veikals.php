@@ -1,4 +1,5 @@
 <?php
+session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
 $pageTitle = 'Veikals';
@@ -43,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
   $klienta_id = isset($_SESSION['klients_id']) ? (int)$_SESSION['klients_id'] : 0;
   $galUrl   = escape($savienojums, $_POST['gallery_url'] ?? '');
 
+  $fotoInfo = '';
+
   if (!empty($_FILES['foto']['name'])) {
     $uploadDir = __DIR__ . '/uploads/pasutijumi/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
@@ -50,20 +53,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
     if (in_array($ext, ['jpg','jpeg','png','webp'])) {
       $filename = uniqid() . '.' . $ext;
       if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $filename)) {
-        mysqli_query($savienojums, "INSERT IGNORE INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$filename','$cropData','$notes','jauns',NOW())");
+        $fotoInfo = $filename;
+        @mysqli_query($savienojums, "INSERT INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$filename','$cropData','$notes','jauns',NOW())");
         $uploadSuccess = 'Pasūtījums saņemts!';
       } else {
-        $uploadError = 'Augšupielādes kļūda. Pārbaudiet mapes tiesības.';
+        $uploadError = 'Augšupielādes kļūda. Pārbaudiet mapes tiesības (chmod 755 uploads/pasutijumi/).';
       }
-    } else {
-      $uploadError = 'Atļautie formāti: JPG, PNG, WEBP.';
-    }
+    } else { $uploadError = 'Atļautie formāti: JPG, PNG, WEBP.'; }
   } elseif (!empty($galUrl)) {
-    // Gallery photo order
-    mysqli_query($savienojums, "INSERT IGNORE INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$galUrl','$cropData','$notes','jauns',NOW())");
+    $fotoInfo = $galUrl;
+    @mysqli_query($savienojums, "INSERT INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$galUrl','$cropData','$notes','jauns',NOW())");
     $uploadSuccess = 'Pasūtījums saņemts!';
-  } else {
-    $uploadError = 'Lūdzu pievienojiet fotogrāfiju.';
+  } else { $uploadError = 'Lūdzu pievienojiet fotogrāfiju.'; }
+
+  // PHPMailer — foto pasūtījuma paziņojums
+  if ($uploadSuccess) {
+    $klientaVards = $_SESSION['klients_vards'] ?? 'Viesis';
+    $klientaEmail = $_SESSION['klients_epasts'] ?? '';
+    require_once __DIR__ . '/includes/mailer.php';
+    mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $produkts, $notes, $fotoInfo);
+    if ($klientaEmail) mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $produkts, $notes);
   }
 }
 
@@ -199,7 +208,13 @@ if (isset($_SESSION['klients_id'])) {
   <div class="cart-items" id="cartItems"></div>
   <div class="cart-footer">
     <div class="cart-total" id="cartTotal"></div>
-    <button class="btn-primary" style="width:100%;margin-top:14px;" onclick="checkout()">Noformēt Pasūtījumu →</button>
+    <button class="btn-primary" style="width:100%;margin-top:14px;" onclick="checkout()" id="checkoutBtn">
+      Apmaksāt ar karti →
+    </button>
+    <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--grey2);display:flex;align-items:center;justify-content:center;gap:6px;">
+      <svg width="38" height="16" viewBox="0 0 38 16" fill="none" xmlns="http://www.w3.org/2000/svg"><text x="0" y="13" font-family="Arial" font-size="13" fill="#6772e5" font-weight="bold">stripe</text></svg>
+      <span>Drošs maksājums</span>
+    </div>
   </div>
 </div>
 
@@ -467,7 +482,23 @@ function addToCartAjax(id,name){
     .then(d=>{document.getElementById('cartCount').textContent=d.count;showToast(name+' pievienots grozam ✓','success');});
 }
 
-function checkout(){showToast('Pasūtījums nosūtīts! Paldies!','success');document.getElementById('cartSidebar').classList.remove('open');}
+function checkout(){
+  const btn = document.querySelector('#cartSidebar .btn-primary');
+  if (btn) { btn.textContent = 'Apstrādā...'; btn.disabled = true; }
+  fetch('/4pt/blazkova/lumina/Lumina/stripe_checkout.php?action=create_checkout', {method:'POST'})
+    .then(r=>r.json())
+    .then(data=>{
+      if (data.url) {
+        window.location.href = data.url; // redirect to Stripe
+      } else {
+        showToast(data.error || 'Kļūda. Mēģiniet vēlreiz.', 'error');
+        if (btn) { btn.textContent = 'Noformēt Pasūtījumu →'; btn.disabled = false; }
+      }
+    }).catch(()=>{
+      showToast('Savienojuma kļūda.', 'error');
+      if (btn) { btn.textContent = 'Noformēt Pasūtījumu →'; btn.disabled = false; }
+    });
+}
 
 // ── Photo editor ─────────────────────────
 let loadedImage=null,loadedFile=null,selectedProduct=null,isDragging=false,dragStart={x:0,y:0};
@@ -653,4 +684,6 @@ if(dz){
 
 <?php if($uploadSuccess): ?>window.addEventListener('DOMContentLoaded',()=>openModal('successModal'));<?php endif; ?>
 <?php if($uploadError): ?>window.addEventListener('DOMContentLoaded',()=>showToast('<?= addslashes($uploadError) ?>','error'));<?php endif; ?>
+<?php if(isset($_GET['paid'])): ?>window.addEventListener('DOMContentLoaded',()=>{document.getElementById('cartCount').textContent='0';openModal('successModal');});<?php endif; ?>
+<?php if(isset($_GET['cancelled'])): ?>window.addEventListener('DOMContentLoaded',()=>showToast('Maksājums atcelts. Grozs saglabāts.','error'));<?php endif; ?>
 </script>

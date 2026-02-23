@@ -147,3 +147,74 @@ function handleImagePreview(files, previewContainerId) {
     container.appendChild(item);
   });
 }
+
+// ── Cart sidebar ─────────────────────────────
+function openCart() {
+  const sidebar = document.getElementById('cartSidebar');
+  if (sidebar) {
+    sidebar.classList.add('open');
+    loadCartItems();
+  }
+}
+
+function loadCartItems() {
+  fetch('/4pt/blazkova/lumina/Lumina/cart.php?action=get')
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('cartItems');
+      const totalEl = document.getElementById('cartTotal');
+      const checkoutBtn = document.getElementById('checkoutBtn');
+      if (!container) return;
+      if (!data.items || data.items.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#888;font-size:14px;line-height:1.8;"><div style="font-size:32px;margin-bottom:12px;opacity:.3;">🛒</div>Grozs ir tukšs</div>';
+        if (totalEl) totalEl.textContent = '';
+        if (checkoutBtn) { checkoutBtn.disabled = true; checkoutBtn.style.opacity = '0.4'; }
+        return;
+      }
+      if (checkoutBtn) { checkoutBtn.disabled = false; checkoutBtn.style.opacity = '1'; }
+      let html = '';
+      let total = 0;
+      data.items.forEach(item => {
+        total += item.cena * item.qty;
+        html += `<div class="cart-item">
+          <div style="flex:1;">
+            <div class="cart-item-name">${item.name}</div>
+            <div class="cart-item-qty" style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="color:#888;font-size:12px;">× ${item.qty}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <div class="cart-item-price">€${(item.cena * item.qty).toFixed(2)}</div>
+            <button class="cart-item-remove" onclick="removeFromCart(${item.id})" title="Noņemt">×</button>
+          </div>
+        </div>`;
+      });
+      container.innerHTML = html;
+      if (totalEl) totalEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <span style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--grey2);">Kopā</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-size:28px;color:var(--gold);">€${total.toFixed(2)}</span>
+        </div>
+        <div style="font-size:10px;color:var(--grey2);text-align:right;">Ieskaitot PVN</div>`;
+    }).catch(() => {});
+}
+
+function removeFromCart(id) {
+  fetch('/4pt/blazkova/lumina/Lumina/cart.php?action=remove&id=' + id)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('cartCount').textContent = data.count;
+      loadCartItems();
+    });
+}
+
+// Open cart when clicking cart icon
+document.addEventListener('DOMContentLoaded', () => {
+  const cartIcon = document.querySelector('.cart-icon');
+  if (cartIcon) {
+    cartIcon.addEventListener('click', e => {
+      e.preventDefault();
+      openCart();
+    });
+  }
+});
