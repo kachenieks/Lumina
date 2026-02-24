@@ -1,62 +1,79 @@
 <?php
 /**
- * LUMINA — Stripe Checkout
- * Ievieto savus Stripe atslēgas zemāk!
+ * LUMINA — Stripe Checkout (cURL, nav vajadzīga bibliotēka)
  */
 session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
-require_once __DIR__ . '/includes/mailer.php';
 
-// ══════════════════════════════════════════
-//  IELIEC ŠEIT SAVUS STRIPE ATSLĒGAS
-// ══════════════════════════════════════════
-define('STRIPE_SECRET_KEY', 'sk_test_51S7aYd1BTbbN3kVbxXXrLPBOtdA2iMfhj6m9uiUXdHAqa93jvHorghulXfFRoF0cC2aR0Cv8KRznsu6zSykQfnys00xavsSCOw');
-define('SITE_BASE', 'https://kristovskis.lv/4pt/blazkova/lumina/Lumina');
-// ══════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  !! IELIEC SAVU STRIPE SECRET KEY ŠEIT !!
+//  Atrodi: stripe.com → Developers → API keys
+// ══════════════════════════════════════════════════
+define('STRIPE_KEY', 'sk_test_51SDpRVHB157X3y90xO2i2qWUYT4OVYkSt5yDLABNTuruLY0QDWvcLKVgTivBADWGU7THD7f0k00B7xFmsWgiKEcb00pcGuiASA');
+define('SITE_BASE',  'https://kristovskis.lv/4pt/blazkova/lumina/Lumina');
+// ══════════════════════════════════════════════════
 
+header('Content-Type: application/json');
 $action = $_GET['action'] ?? '';
 
-// ── Izveidot Stripe Checkout sesiju ────────────────────────
+// ── Diagnostika — pārbaude vai Stripe strādā ─────
+if ($action === 'test') {
+  $errors = [];
+  if (!function_exists('curl_init'))     $errors[] = 'cURL nav iespējots serverī';
+  if (strpos(STRIPE_KEY, 'IEVIETO') !== false) $errors[] = 'Stripe atslēga nav ielikta';
+  // Try Stripe connection
+  if (empty($errors)) {
+    $ch = curl_init('https://api.stripe.com/v1/balance');
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_USERPWD        => STRIPE_KEY . ':',
+      CURLOPT_TIMEOUT        => 10,
+      CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($ch);
+    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    if ($err)     $errors[] = 'cURL kļūda: ' . $err;
+    elseif ($http === 401) $errors[] = 'Stripe atslēga ir nepareiza (401 Unauthorized)';
+    elseif ($http !== 200) $errors[] = 'Stripe atbildēja ar HTTP ' . $http . ': ' . substr($body, 0, 200);
+  }
+  echo json_encode($errors ? ['status'=>'kļūda','kļūdas'=>$errors] : ['status'=>'OK','message'=>'Stripe darbojas!']);
+  exit;
+}
+
+// ── Izveidot checkout sesiju ─────────────────────
 if ($action === 'create_checkout') {
-  header('Content-Type: application/json');
-
-  if (!isset($_SESSION['cart']) || empty($_SESSION['cart'])) {
-    echo json_encode(['error' => 'Grozs ir tukšs']); exit;
-  }
-
-  // Check curl is available
   if (!function_exists('curl_init')) {
-    echo json_encode(['error' => 'cURL nav pieejams serverī. Sazinieties ar hostingu.']); exit;
+    echo json_encode(['error'=>'cURL nav iespējots serverī. Sazinieties ar hostu.']); exit;
+  }
+  if (strpos(STRIPE_KEY, 'IEVIETO') !== false) {
+    echo json_encode(['error'=>'Stripe atslēga nav konfigurēta stripe_checkout.php failā.']); exit;
+  }
+  if (empty($_SESSION['cart'])) {
+    echo json_encode(['error'=>'Grozs ir tukšs']); exit;
   }
 
-  // Check Stripe key is set
-  if (strpos(STRIPE_SECRET_KEY, 'IEVIETO') !== false) {
-    echo json_encode(['error' => 'Stripe atslēga nav konfigurēta. Ieliec savu sk_test_... stripe_checkout.php failā.']); exit;
-  }
-
-  $lineItems = [];
+  $params = [];
   $i = 0;
-  foreach ($_SESSION['cart'] as $id => $item) {
-    $lineItems["line_items[$i][price_data][currency]"] = 'eur';
-    $lineItems["line_items[$i][price_data][unit_amount]"] = (int)round($item['cena'] * 100);
-    $lineItems["line_items[$i][price_data][product_data][name]"] = $item['name'];
-    $lineItems["line_items[$i][quantity]"] = (int)$item['qty'];
+  foreach ($_SESSION['cart'] as $item) {
+    $params["line_items[$i][price_data][currency]"]              = 'eur';
+    $params["line_items[$i][price_data][unit_amount]"]           = (int)round($item['cena'] * 100);
+    $params["line_items[$i][price_data][product_data][name]"]    = $item['name'];
+    $params["line_items[$i][quantity]"]                          = (int)$item['qty'];
     $i++;
   }
 
-  $orderId = 'LUM' . date('ymd') . strtoupper(substr(uniqid(), -4));
+  $orderId = 'LUM' . date('ymd') . strtoupper(substr(uniqid(), -5));
   $_SESSION['pending_order_id'] = $orderId;
 
-  $params = array_merge($lineItems, [
-    'mode'                => 'payment',
-    'payment_method_types[0]' => 'card',
-    'success_url'         => SITE_BASE . '/stripe_checkout.php?action=success&order=' . $orderId . '&session_id={CHECKOUT_SESSION_ID}',
-    'cancel_url'          => SITE_BASE . '/veikals.php?cancelled=1',
-    'metadata[order_id]'  => $orderId,
-    'metadata[klients_id]'=> (int)($_SESSION['klients_id'] ?? 0),
-  ]);
-
+  $params['mode']                    = 'payment';
+  $params['payment_method_types[0]'] = 'card';
+  $params['success_url']             = SITE_BASE . '/stripe_checkout.php?action=success&order=' . $orderId . '&session_id={CHECKOUT_SESSION_ID}';
+  $params['cancel_url']              = SITE_BASE . '/veikals.php?cancelled=1';
+  $params['metadata[order_id]']      = $orderId;
+  $params['metadata[klients_id]']    = (int)($_SESSION['klients_id'] ?? 0);
   if (!empty($_SESSION['klients_epasts'])) {
     $params['customer_email'] = $_SESSION['klients_epasts'];
   }
@@ -66,65 +83,63 @@ if ($action === 'create_checkout') {
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
     CURLOPT_POSTFIELDS     => http_build_query($params),
-    CURLOPT_USERPWD        => STRIPE_SECRET_KEY . ':',
+    CURLOPT_USERPWD        => STRIPE_KEY . ':',
     CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
     CURLOPT_SSL_VERIFYPEER => true,
-    CURLOPT_TIMEOUT        => 15,
+    CURLOPT_TIMEOUT        => 20,
   ]);
 
-  $body    = curl_exec($ch);
+  $body     = curl_exec($ch);
   $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  $curlError = curl_error($ch);
+  $curlErr  = curl_error($ch);
   curl_close($ch);
 
-  if ($curlError) {
-    error_log('Stripe cURL error: ' . $curlError);
-    echo json_encode(['error' => 'Savienojuma kļūda ar Stripe. ' . $curlError]); exit;
+  if ($curlErr) {
+    echo json_encode(['error' => 'Savienojuma kļūda: ' . $curlErr]); exit;
   }
-
   $resp = json_decode($body, true);
   if ($httpCode === 200 && isset($resp['url'])) {
     echo json_encode(['url' => $resp['url']]);
   } else {
     $msg = $resp['error']['message'] ?? ('HTTP ' . $httpCode);
-    error_log('Stripe error: ' . $body);
-    echo json_encode(['error' => 'Stripe kļūda: ' . $msg]);
+    echo json_encode(['error' => 'Stripe: ' . $msg]);
   }
   exit;
 }
 
-// ── Veiksmīgs maksājums — atgriešanās ────────────────────
+// ── Veiksmīgs maksājums ──────────────────────────
 if ($action === 'success') {
+  header('Content-Type: text/html'); // redirect, not JSON
   $orderId = $_GET['order'] ?? ($_SESSION['pending_order_id'] ?? '');
-  $sessionId = $_GET['session_id'] ?? '';
 
-  if (!empty($orderId) && isset($_SESSION['cart']) && !empty($_SESSION['cart'])) {
+  if (!empty($orderId) && !empty($_SESSION['cart'])) {
     $klientsId    = (int)($_SESSION['klients_id'] ?? 0);
     $klientaVards = $_SESSION['klients_vards'] ?? 'Klients';
     $klientaEmail = $_SESSION['klients_epasts'] ?? '';
 
-    $items = [];
-    $total = 0;
+    $items = []; $total = 0;
     foreach ($_SESSION['cart'] as $item) {
       $items[] = $item;
       $total += $item['cena'] * $item['qty'];
     }
 
-    // Save to DB
-    $oidEsc = escape($savienojums, $orderId);
-    $totalEsc = number_format($total, 2);
+    $oidEsc   = escape($savienojums, $orderId);
+    $totalFmt = number_format($total, 2);
     @mysqli_query($savienojums,
       "INSERT IGNORE INTO pasutijumi (klienta_id, produkts, foto_fails, papildu_info, statuss, izveidots)
-       VALUES ($klientsId, '$oidEsc', '', 'Stripe €$totalEsc', 'apmaksats', NOW())"
+       VALUES ($klientsId, '$oidEsc', '', 'Stripe €$totalFmt', 'apmaksats', NOW())"
     );
-
     if ($klientsId) {
-      mysqli_query($savienojums, "UPDATE klienti SET kopeja_summa = kopeja_summa + $total WHERE id=$klientsId");
+      @mysqli_query($savienojums, "UPDATE klienti SET kopeja_summa = kopeja_summa + $total WHERE id=$klientsId");
     }
 
-    // Emails
-    if ($klientaEmail) mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
-    mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+    // Send emails — only if mailer is available
+    $mailerPath = __DIR__ . '/includes/mailer.php';
+    if (file_exists($mailerPath)) {
+      require_once $mailerPath;
+      if ($klientaEmail) @mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
+      @mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+    }
 
     $_SESSION['cart'] = [];
     unset($_SESSION['pending_order_id']);
@@ -134,13 +149,11 @@ if ($action === 'success') {
   exit;
 }
 
-// ── Stripe Webhook ─────────────────────────────────────────
+// ── Webhook ──────────────────────────────────────
 if ($action === 'webhook') {
-  header('Content-Type: application/json');
   $payload = @file_get_contents('php://input');
   $event = json_decode($payload, true);
   if ($event && $event['type'] === 'checkout.session.completed') {
-    // Mark as paid
     $oid = escape($savienojums, $event['data']['object']['metadata']['order_id'] ?? '');
     if ($oid) @mysqli_query($savienojums, "UPDATE pasutijumi SET statuss='apmaksats' WHERE produkts='$oid'");
   }
@@ -150,4 +163,3 @@ if ($action === 'webhook') {
 }
 
 echo json_encode(['error' => 'Nezināma darbība']);
-?>

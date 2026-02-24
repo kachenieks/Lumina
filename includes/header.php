@@ -31,17 +31,17 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
     <li><a href="/4pt/blazkova/lumina/Lumina/index.php#contact">Kontakti</a></li>
   </ul>
   <div class="nav-right">
-    <a href="/4pt/blazkova/lumina/Lumina/veikals.php#cart" class="cart-icon" title="Grozs">
+    <button onclick="openCart()" class="cart-icon" title="Grozs" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;position:relative;">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
         <line x1="3" y1="6" x2="21" y2="6"/>
         <path d="M16 10a4 4 0 01-8 0"/>
       </svg>
       <?php
-      $cartCount = isset($_SESSION['cart']) ? count($_SESSION['cart']) : 0;
+      $cartCount = isset($_SESSION['cart']) ? array_sum(array_column($_SESSION['cart'], 'qty')) : 0;
       ?>
       <div class="cart-dot" id="cartCount"><?= $cartCount ?></div>
-    </a>
+    </button>
     <?php if (isset($_SESSION['klients_id'])): ?>
       <a href="/4pt/blazkova/lumina/Lumina/profils.php" class="nav-btn">Profils</a>
       <a href="/4pt/blazkova/lumina/Lumina/logout.php" class="nav-btn" style="border-color:rgba(184,151,90,0.2);">Iziet</a>
@@ -52,45 +52,34 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
   </div>
 </nav>
 
-<!-- Dark page transition overlay -->
-<div id="pageTransition" style="position:fixed;inset:0;background:#1C1C1C;z-index:9999;pointer-events:none;opacity:0;transition:opacity .45s cubic-bezier(.4,0,.2,1);"></div>
-
+<!-- Global cart sidebar (works on every page) -->
+<div id="globalCartOverlay" onclick="closeGlobalCart()" style="position:fixed;inset:0;background:rgba(0,0,0,0);z-index:1099;display:none;transition:background .3s;"></div>
+<div id="globalCartSidebar" style="
+  position:fixed;top:0;right:0;width:380px;max-width:95vw;height:100vh;
+  background:#fff;z-index:1100;
+  transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.12);
+">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:24px 28px;border-bottom:1px solid #f0ece4;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:#1C1C1C;letter-spacing:1px;">Grozs</div>
+    <button onclick="closeGlobalCart()" style="background:none;border:none;cursor:pointer;font-size:24px;color:#888;line-height:1;padding:4px;">×</button>
+  </div>
+  <div id="globalCartItems" style="flex:1;overflow-y:auto;padding:0 28px;"></div>
+  <div style="padding:20px 28px;border-top:1px solid #f0ece4;">
+    <div id="globalCartTotal" style="margin-bottom:14px;"></div>
+    <button id="globalCheckoutBtn" onclick="globalCheckout()" style="
+      width:100%;padding:14px;background:#1C1C1C;color:#B8975A;
+      border:none;cursor:pointer;font-size:11px;letter-spacing:3px;
+      text-transform:uppercase;font-family:'Montserrat',sans-serif;font-weight:600;
+      transition:.2s;
+    " onmouseover="this.style.background='#B8975A';this.style.color='#fff';"
+       onmouseout="this.style.background='#1C1C1C';this.style.color='#B8975A';">
+      Apmaksāt ar karti →
+    </button>
+    <div style="text-align:center;margin-top:10px;font-size:10px;color:#aaa;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <span style="color:#6772e5;font-weight:700;font-family:Arial;">stripe</span>
+      <span>· Drošs maksājums</span>
+    </div>
+  </div>
+</div>
 <div class="toast-container" id="toastContainer"></div>
-
-<script>
-// Page transition — dark overlay on nav link clicks, fade in on every page load
-(function(){
-  const overlay = document.getElementById('pageTransition');
-  const navigated = sessionStorage.getItem('lumina_nav');
-
-  // Fade IN on load — if we navigated here via a link, start dark then fade clear
-  if (navigated) {
-    sessionStorage.removeItem('lumina_nav');
-    overlay.style.opacity = '1';
-    overlay.style.transition = 'none';
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        overlay.style.transition = 'opacity .5s cubic-bezier(.4,0,.2,1)';
-        overlay.style.opacity = '0';
-      });
-    });
-  }
-
-  // Fade OUT before leaving — on ALL internal nav links
-  document.addEventListener('click', function(e) {
-    const a = e.target.closest('a');
-    if (!a) return;
-    const href = a.getAttribute('href');
-    if (!href) return;
-    // Skip: external, anchors, admin, javascript, logout, same-page tab switches
-    if (href.startsWith('#') || href.startsWith('javascript') || href.startsWith('http') || href.startsWith('//')) return;
-    if (href.includes('/admin/') || href.includes('logout')) return;
-    if (href.includes('?tab=') || href.includes('&tab=')) return;
-
-    e.preventDefault();
-    sessionStorage.setItem('lumina_nav', '1');
-    overlay.style.opacity = '1';
-    setTimeout(() => { window.location.href = href; }, 440);
-  });
-})();
-</script>

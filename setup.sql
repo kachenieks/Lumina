@@ -48,3 +48,6 @@ CREATE TABLE IF NOT EXISTS `galeriju_foto` (
   PRIMARY KEY (`id`),
   KEY `galerijas_id` (`galerijas_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── 4. KLIENTI — pievieno izveidots kolonnu ja nav ──────────
+ALTER TABLE `klienti` ADD COLUMN `izveidots` datetime DEFAULT CURRENT_TIMESTAMP;

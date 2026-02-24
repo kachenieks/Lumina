@@ -10,7 +10,8 @@ $monthRez    = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n,
 $waitingRez  = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM rezervacijas WHERE statuss='gaida'"));
 $nextWeekRez = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM rezervacijas WHERE datums BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 7 DAY) AND statuss!='atcelts'"));
 $klienti     = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM klienti"));
-$newKlienti  = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM klienti WHERE DATE(izveidots) >= DATE_SUB(CURDATE(),INTERVAL 30 DAY)"));
+$newKlientiR = @mysqli_query($savienojums, "SELECT COUNT(*) n FROM klienti WHERE DATE(izveidots) >= DATE_SUB(CURDATE(),INTERVAL 30 DAY)");
+$newKlienti  = $newKlientiR ? mysqli_fetch_assoc($newKlientiR) : ['n' => '?'];
 $galerijas   = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM galerijas"));
 $totalFoto   = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM galeriju_foto"));
 $portfolio   = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT COUNT(*) n FROM portfolio WHERE aktivs=1"));

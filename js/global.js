@@ -148,13 +148,101 @@ function handleImagePreview(files, previewContainerId) {
   });
 }
 
-// ── Cart sidebar ─────────────────────────────
+// ── Global Cart sidebar (works on every page) ─────────────
 function openCart() {
-  const sidebar = document.getElementById('cartSidebar');
-  if (sidebar) {
-    sidebar.classList.add('open');
+  // Prefer local cart sidebar (veikals.php), fallback to global
+  const local = document.getElementById('cartSidebar');
+  if (local) {
+    local.classList.add('open');
     loadCartItems();
+    return;
   }
+  // Global sidebar in header
+  const sidebar = document.getElementById('globalCartSidebar');
+  const overlay = document.getElementById('globalCartOverlay');
+  if (sidebar) {
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => {
+      overlay.style.background = 'rgba(0,0,0,0.35)';
+      sidebar.style.transform = 'translateX(0)';
+    });
+    loadGlobalCartItems();
+  }
+}
+
+function closeGlobalCart() {
+  const sidebar = document.getElementById('globalCartSidebar');
+  const overlay = document.getElementById('globalCartOverlay');
+  if (!sidebar) return;
+  sidebar.style.transform = 'translateX(100%)';
+  overlay.style.background = 'rgba(0,0,0,0)';
+  setTimeout(() => { overlay.style.display = 'none'; }, 350);
+}
+
+function loadGlobalCartItems() {
+  fetch('/4pt/blazkova/lumina/Lumina/cart.php?action=get')
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('globalCartItems');
+      const totalEl   = document.getElementById('globalCartTotal');
+      const btn       = document.getElementById('globalCheckoutBtn');
+      if (!container) return;
+      if (!data.items || data.items.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:48px 20px;color:#aaa;"><div style="font-size:40px;margin-bottom:12px;opacity:.3;">🛒</div><div style="font-size:13px;">Grozs ir tukšs</div></div>';
+        if (totalEl) totalEl.innerHTML = '';
+        if (btn) { btn.disabled = true; btn.style.opacity = '.4'; }
+        return;
+      }
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      let html = '', total = 0;
+      data.items.forEach(item => {
+        total += item.cena * item.qty;
+        html += `<div style="display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #f5f0e8;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;color:#1C1C1C;margin-bottom:2px;">${item.name}</div>
+            <div style="font-size:11px;color:#aaa;">× ${item.qty}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:#B8975A;">€${(item.cena*item.qty).toFixed(2)}</div>
+            <button onclick="removeFromGlobalCart(${item.id})" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;padding:2px 4px;line-height:1;" title="Noņemt">×</button>
+          </div>
+        </div>`;
+      });
+      container.innerHTML = html;
+      if (totalEl) totalEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#aaa;">Kopā</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-size:26px;color:#B8975A;">€${total.toFixed(2)}</span>
+        </div>
+        <div style="font-size:10px;color:#ccc;text-align:right;margin-top:2px;">Ieskaitot PVN</div>`;
+    }).catch(() => {});
+}
+
+function removeFromGlobalCart(id) {
+  fetch('/4pt/blazkova/lumina/Lumina/cart.php?action=remove&id=' + id)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('cartCount').textContent = data.count;
+      loadGlobalCartItems();
+    });
+}
+
+function globalCheckout() {
+  const btn = document.getElementById('globalCheckoutBtn');
+  if (btn) { btn.textContent = 'Apstrādā...'; btn.disabled = true; }
+  fetch('/4pt/blazkova/lumina/Lumina/stripe_checkout.php?action=create_checkout', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showToast(data.error || 'Kļūda. Mēģiniet vēlreiz.', 'error');
+        if (btn) { btn.textContent = 'Apmaksāt ar karti →'; btn.disabled = false; btn.style.opacity = '1'; }
+      }
+    }).catch(() => {
+      showToast('Savienojuma kļūda.', 'error');
+      if (btn) { btn.textContent = 'Apmaksāt ar karti →'; btn.disabled = false; btn.style.opacity = '1'; }
+    });
 }
 
 function loadCartItems() {
