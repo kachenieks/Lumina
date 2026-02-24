@@ -112,11 +112,33 @@ include __DIR__ . '/includes/header.php';
           ?>
           <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:<?= $sc[$sl]??'#999' ?>22;color:<?= $sc[$sl]??'#999' ?>;font-weight:600;"><?= ucfirst($sl) ?></span>
         </td>
-        <td style="white-space:nowrap;">
-          <?php if ($sl !== 'apstiprinats'): ?><a href="?status=apstiprinats&id=<?= $r['id'] ?>&tab=rezervacijas" class="action-btn success" title="Apstiprināt">✓</a><?php endif; ?>
-          <?php if ($sl !== 'pabeigts'): ?><a href="?status=pabeigts&id=<?= $r['id'] ?>&tab=rezervacijas" class="action-btn" title="Pabeigt">✔</a><?php endif; ?>
-          <?php if ($sl !== 'atcelts'): ?><a href="?status=atcelts&id=<?= $r['id'] ?>&tab=rezervacijas" class="action-btn danger" title="Atcelt" onclick="return confirm('Atcelt rezervāciju?')">✕</a><?php endif; ?>
-          <a href="?delete=<?= $r['id'] ?>&tab=rezervacijas" class="action-btn danger" onclick="return confirm('Dzēst rezervāciju #<?= $r['id'] ?>?')">🗑</a>
+        <td>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <?php if ($sl === 'gaida'): ?>
+            <a href="?status=apstiprinats&id=<?= $r['id'] ?>&tab=rezervacijas"
+               onclick="return confirm('Apstiprināt un nosūtīt e-pastu klientam?')"
+               style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
+               title="Apstiprināt — klients saņems e-pastu ✉">✓ Apstiprināt</a>
+            <?php elseif ($sl === 'apstiprinats'): ?>
+            <span style="padding:5px 9px;background:#f5f5f5;color:#aaa;border:1px solid #e0e0e0;border-radius:4px;font-size:11px;">✓ Apstiprināts</span>
+            <?php endif; ?>
+            <?php if ($sl !== 'pabeigts' && $sl !== 'atcelts'): ?>
+            <a href="?status=pabeigts&id=<?= $r['id'] ?>&tab=rezervacijas"
+               onclick="return confirm('Atzīmēt kā pabeigtu? Klients saņems paziņojumu.')"
+               style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#e8f4fd;color:#1565c0;border:1px solid #90caf9;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
+               title="Sesija pabeigta — klients saņems e-pastu">✔ Pabeigts</a>
+            <?php endif; ?>
+            <?php if ($sl !== 'atcelts'): ?>
+            <a href="?status=atcelts&id=<?= $r['id'] ?>&tab=rezervacijas"
+               onclick="return confirm('Atcelt? Klients saņems atcelšanas e-pastu.')"
+               style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#fef0f0;color:#b71c1c;border:1px solid #ef9a9a;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
+               title="Atcelt un informēt klientu">✕ Atcelt</a>
+            <?php endif; ?>
+            <a href="?delete=<?= $r['id'] ?>&tab=rezervacijas"
+               onclick="return confirm('Dzēst rezervāciju #<?= $r['id'] ?>? Nevar atsaukt.')"
+               style="padding:5px 8px;background:#f5f5f5;color:#888;border:1px solid #ddd;border-radius:4px;font-size:11px;text-decoration:none;"
+               title="Dzēst ierakstu">🗑</a>
+          </div>
         </td>
       </tr>
       <?php if ($r['papildu_info']): ?>

@@ -52,4 +52,45 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
   </div>
 </nav>
 
+<!-- Dark page transition overlay -->
+<div id="pageTransition" style="position:fixed;inset:0;background:#1C1C1C;z-index:9999;pointer-events:none;opacity:0;transition:opacity .45s cubic-bezier(.4,0,.2,1);"></div>
+
 <div class="toast-container" id="toastContainer"></div>
+
+<script>
+// Page transition — dark overlay on nav link clicks, fade in on every page load
+(function(){
+  const overlay = document.getElementById('pageTransition');
+  const navigated = sessionStorage.getItem('lumina_nav');
+
+  // Fade IN on load — if we navigated here via a link, start dark then fade clear
+  if (navigated) {
+    sessionStorage.removeItem('lumina_nav');
+    overlay.style.opacity = '1';
+    overlay.style.transition = 'none';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        overlay.style.transition = 'opacity .5s cubic-bezier(.4,0,.2,1)';
+        overlay.style.opacity = '0';
+      });
+    });
+  }
+
+  // Fade OUT before leaving — on ALL internal nav links
+  document.addEventListener('click', function(e) {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (!href) return;
+    // Skip: external, anchors, admin, javascript, logout, same-page tab switches
+    if (href.startsWith('#') || href.startsWith('javascript') || href.startsWith('http') || href.startsWith('//')) return;
+    if (href.includes('/admin/') || href.includes('logout')) return;
+    if (href.includes('?tab=') || href.includes('&tab=')) return;
+
+    e.preventDefault();
+    sessionStorage.setItem('lumina_nav', '1');
+    overlay.style.opacity = '1';
+    setTimeout(() => { window.location.href = href; }, 440);
+  });
+})();
+</script>

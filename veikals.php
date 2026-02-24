@@ -2,6 +2,8 @@
 session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
+// Disable strict mysqli exceptions so @ suppressor works properly
+mysqli_report(MYSQLI_REPORT_OFF);
 $pageTitle = 'Veikals';
 $extraCss = 'veikals.css';
 

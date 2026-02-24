@@ -8,7 +8,7 @@ if (isset($_SESSION['admin_auth'])) {
 }
 
 // Admin password - change this!
-$adminPassword = 'Lumina2026!';
+$adminPassword = 'Lumina@2026!';
 
 $error = '';
 $attempts = $_SESSION['login_attempts'] ?? 0;
