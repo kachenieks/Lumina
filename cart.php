@@ -20,8 +20,13 @@ if ($action === 'add') {
   }
 
 } elseif ($action === 'remove') {
-  $id = (int)($_GET['id'] ?? 0);
-  unset($_SESSION['cart'][$id]);
+  $id = $_GET['id'] ?? '';
+  // Handle both numeric IDs and foto_xxx string keys
+  if (is_numeric($id)) {
+    unset($_SESSION['cart'][(int)$id]);
+  } else {
+    unset($_SESSION['cart'][$id]);
+  }
 
 } elseif ($action === 'clear') {
   $_SESSION['cart'] = [];
@@ -41,8 +46,16 @@ if ($action === 'add') {
 }
 
 $items = [];
-foreach ($_SESSION['cart'] as $id => $item) {
-  $items[] = ['id' => (int)$id, 'name' => $item['name'], 'cena' => (float)$item['cena'], 'qty' => (int)$item['qty']];
+foreach ($_SESSION['cart'] as $key => $item) {
+  $items[] = [
+    'id'       => is_numeric($key) ? (int)$key : $key,
+    'name'     => $item['name'],
+    'cena'     => (float)$item['cena'],
+    'qty'      => (int)$item['qty'],
+    'is_foto'  => !empty($item['is_foto']),
+    'foto_url' => $item['foto_url'] ?? '',
+    'notes'    => $item['notes'] ?? '',
+  ];
 }
 
 $count = array_sum(array_column($_SESSION['cart'], 'qty'));

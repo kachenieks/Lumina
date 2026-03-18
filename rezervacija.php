@@ -43,9 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $talrunis = $kl['talrunis'] ?? '';
       }
       $rezData = ['pakalpojums'=>$pakalpojums,'datums'=>$datums,'laiks'=>$laiks,'vieta'=>$vieta,'cena'=>$cena,'papildu_info'=>$papildu];
-      require_once __DIR__ . '/includes/mailer.php';
-      mailRezervacijaAdmin($rezData, $klientaVards, $klientaEmail, $talrunis);
-      if ($klientaEmail) mailRezervacijaKlients($klientaEmail, $klientaVards, $rezData);
+      try { require_once __DIR__ . '/includes/mailer.php'; mailRezervacijaAdmin($rezData, $klientaVards, $klientaEmail, $talrunis); if ($klientaEmail) mailRezervacijaKlients($klientaEmail, $klientaVards, $rezData); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
     } else {
       $error = 'Kļūda: ' . mysqli_error($savienojums);
     }

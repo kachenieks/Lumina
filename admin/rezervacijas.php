@@ -14,8 +14,7 @@ if (isset($_GET['status'])) {
   mysqli_query($savienojums, "UPDATE rezervacijas SET statuss='$status' WHERE id=$id");
   $rez = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT r.*, k.epasts, k.vards FROM rezervacijas r LEFT JOIN klienti k ON r.klienta_id=k.id WHERE r.id=$id"));
   if ($rez && $rez['epasts']) {
-    require_once __DIR__ . '/../includes/mailer.php';
-    mailRezervacijaStatuss($rez['epasts'], $rez['vards'], $rez, $status);
+    try { require_once __DIR__ . '/../includes/mailer.php'; mailRezervacijaStatuss($rez['epasts'], $rez['vards'], $rez, $status); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
   }
   header('Location: /4pt/blazkova/lumina/Lumina/admin/rezervacijas.php?msg=updated'); exit;
 }

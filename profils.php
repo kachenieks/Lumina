@@ -53,6 +53,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     $hash = password_hash($newPw, PASSWORD_DEFAULT);
     mysqli_query($savienojums, "UPDATE klienti SET parole='$hash' WHERE id=$klientsId");
     $success = 'Parole veiksmīgi mainīta!';
+    // Send confirmation email
+    $klRow2 = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT vards, epasts FROM klienti WHERE id=$klientsId"));
+    try {
+      require_once __DIR__ . '/includes/mailer.php';
+      $html = '<h2 style="font-family:Georgia,serif;font-weight:300;color:#1C1C1C;">Parole nomainīta</h2>
+        <p style="color:#7A7267;line-height:1.8;">Sveiki, <strong>' . htmlspecialchars($klRow2['vards']) . '</strong>!</p>
+        <p style="color:#7A7267;line-height:1.8;">Jūsu LUMINA konta parole tikko tika veiksmīgi nomainīta.</p>
+        <p style="color:#7A7267;line-height:1.8;">Ja šīs izmaiņas neveicāt jūs, lūdzu nekavējoties sazinieties ar mums.</p>
+        <a href="' . SITE_URL . '/profils.php" style="display:inline-block;padding:13px 30px;background:#1C1C1C;color:#B8975A;text-decoration:none;font-size:12px;letter-spacing:2px;text-transform:uppercase;margin-top:20px;">Mans profils →</a>';
+      luminaMail($klRow2['epasts'], $klRow2['vards'], 'Parole nomainīta — LUMINA', $html);
+    } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
   }
 }
 
@@ -100,7 +111,8 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
   <div class="profils-tabs-wrap">
     <div class="profils-tabs">
       <a href="?tab=rezervacijas" class="profils-tab <?= $activeTab==='rezervacijas'?'active':'' ?>">Rezervācijas</a>
-      <a href="?tab=galerijas"    class="profils-tab <?= $activeTab==='galerijas'?'active':'' ?>">Manas Galerijas</a>
+      <a href="?tab=pasutijumi"   class="profils-tab <?= $activeTab==='pasutijumi'?'active':'' ?>">Pasūtījumi</a>
+      <a href="?tab=galerijas"    class="profils-tab <?= $activeTab==='galerijas'?'active':'' ?>">Manas galerijas</a>
       <a href="?tab=iestatijumi"  class="profils-tab <?= $activeTab==='iestatijumi'?'active':'' ?>">Iestatījumi</a>
     </div>
   </div>
@@ -138,6 +150,60 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
           <?php endif; ?>
           <div>
             <span style="font-size:10px;padding:4px 12px;border-radius:20px;background:<?= $sc[$sl]??'#999' ?>18;color:<?= $sc[$sl]??'#999' ?>;font-weight:600;letter-spacing:1px;text-transform:uppercase;"><?= ucfirst($sl) ?></span>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+
+    <!-- ── PASŪTĪJUMI ── -->
+    <?php elseif ($activeTab === 'pasutijumi'): ?>
+    <?php
+    $pasutijumi = [];
+    $pRes = mysqli_query($savienojums, "SELECT * FROM pasutijumi WHERE klienta_id=$klientsId ORDER BY izveidots DESC");
+    while ($p = mysqli_fetch_assoc($pRes)) $pasutijumi[] = $p;
+    ?>
+    <div>
+      <?php if (empty($pasutijumi)): ?>
+      <div style="text-align:center;padding:60px;color:var(--grey);">
+        <div style="font-size:40px;opacity:.3;margin-bottom:16px;">🛍️</div>
+        <p>Jums vēl nav pasūtījumu.</p>
+        <a href="/4pt/blazkova/lumina/Lumina/veikals.php" class="btn-primary" style="display:inline-block;margin-top:20px;">Uz veikalu →</a>
+      </div>
+      <?php else: ?>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <?php foreach ($pasutijumi as $p):
+          $sc = ['jauns'=>'#e67e22','apstiprinats'=>'#27ae60','pabeigts'=>'#2980b9','atcelts'=>'#c0392b','apmaksats'=>'#8e44ad'];
+          $sl = $p['statuss'] ?? 'jauns';
+          $sl_label = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprināts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaksāts'];
+          // Photo src
+          $fotoSrc = null;
+          if (!empty($p['foto_fails'])) {
+            if (filter_var($p['foto_fails'], FILTER_VALIDATE_URL)) {
+              $fotoSrc = $p['foto_fails'];
+            } else {
+              $fotoSrc = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $p['foto_fails'];
+            }
+          }
+        ?>
+        <div style="background:var(--white);border:1px solid var(--grey3);display:flex;gap:0;overflow:hidden;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+          <?php if ($fotoSrc): ?>
+          <div style="width:110px;flex-shrink:0;">
+            <img src="<?= htmlspecialchars($fotoSrc) ?>" alt="" style="width:110px;height:110px;object-fit:cover;display:block;">
+          </div>
+          <?php else: ?>
+          <div style="width:110px;height:110px;flex-shrink:0;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:32px;opacity:.25;">🖼️</div>
+          <?php endif; ?>
+          <div style="padding:16px 20px;flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--ink);"><?= htmlspecialchars($p['produkts']) ?></div>
+              <span style="font-size:9px;padding:4px 10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:<?= ($sc[$sl]??'#999') ?>18;color:<?= $sc[$sl]??'#999' ?>;flex-shrink:0;"><?= $sl_label[$sl]??ucfirst($sl) ?></span>
+            </div>
+            <?php if (!empty($p['papildu_info'])): ?>
+            <div style="font-size:12px;color:var(--grey);margin-top:6px;"><?= htmlspecialchars($p['papildu_info']) ?></div>
+            <?php endif; ?>
+            <div style="font-size:11px;color:var(--grey2);margin-top:8px;"><?= date('d.m.Y H:i', strtotime($p['izveidots'])) ?></div>
           </div>
         </div>
         <?php endforeach; ?>

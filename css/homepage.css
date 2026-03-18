@@ -92,7 +92,10 @@
 .booking-cta-inner { position: relative; z-index: 1; max-width: 600px; }
 
 /* CONTACT SECTION */
-#contact { padding: var(--section-py) var(--px); background: var(--white); }
+#contact {
+  padding: var(--section-py) var(--px);
+  background: var(--ink);
+}
 .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(40px,6vw,96px); }
 
 /* ════ LARGE MONITORS ════ */

@@ -104,3 +104,36 @@ WHERE NOT EXISTS (SELECT 1 FROM `preces` LIMIT 1);
 -- ── 6. KLIENTI — pievieno kolonnas ja trūkst ────────────
 ALTER TABLE `klienti` ADD COLUMN `izveidots` datetime DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE `klienti` ADD COLUMN `kopeja_summa` decimal(10,2) DEFAULT 0.00;
+
+-- ── PRECES tabulas paplašinājums (pasūtījumu sistēma) ────
+ALTER TABLE `preces` ADD COLUMN IF NOT EXISTS `tips`         varchar(50)  DEFAULT 'druka' AFTER `kategorija`;
+ALTER TABLE `preces` ADD COLUMN IF NOT EXISTS `foto_skaits`  int(3)       DEFAULT 1       AFTER `tips`;
+ALTER TABLE `preces` ADD COLUMN IF NOT EXISTS `izmers`       varchar(100) DEFAULT ''      AFTER `foto_skaits`;
+ALTER TABLE `preces` ADD COLUMN IF NOT EXISTS `orientacija`  varchar(20)  DEFAULT 'portrait' AFTER `izmers`;
+
+-- Atjaunina esošos produktus
+UPDATE `preces` SET tips='druka',    foto_skaits=1,  izmers='30×40 cm',   orientacija='portrait'  WHERE nosaukums LIKE '%Fotodruka%'    AND tips IS NULL;
+UPDATE `preces` SET tips='canvas',   foto_skaits=1,  izmers='50×70 cm',   orientacija='portrait'  WHERE nosaukums LIKE '%Canvas%50%'     AND tips IS NULL;
+UPDATE `preces` SET tips='canvas',   foto_skaits=1,  izmers='80×120 cm',  orientacija='portrait'  WHERE nosaukums LIKE '%Canvas%80%'     AND tips IS NULL;
+UPDATE `preces` SET tips='panelis',  foto_skaits=1,  izmers='60×90 cm',   orientacija='portrait'  WHERE nosaukums LIKE '%panelis%'       AND tips IS NULL;
+UPDATE `preces` SET tips='albums',   foto_skaits=20, izmers='30×30 cm',   orientacija='square'    WHERE nosaukums LIKE '%grāmata%'       AND tips IS NULL;
+UPDATE `preces` SET tips='druka',    foto_skaits=1,  izmers='20×30 cm',   orientacija='portrait'  WHERE tips IS NULL;
+
+-- Pievieno jaunus produktus (ja nav)
+INSERT INTO `preces` (nosaukums, kategorija, tips, foto_skaits, izmers, orientacija, cena, apraksts, attels_url, bestseller, aktivs)
+SELECT nosaukums, kategorija, tips, foto_skaits, izmers, orientacija, cena, apraksts, attels_url, bestseller, aktivs FROM (VALUES
+  ROW('Fotodruka 20×30',    'Druka',   'druka',   1,  '20×30 cm',  'portrait', 29.00, 'Augstas kvalitātes druka uz matēta papīra.',              'https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=600&q=80', 0, 1),
+  ROW('Fotodruka 30×40',    'Druka',   'druka',   1,  '30×40 cm',  'portrait', 39.00, 'Augstas kvalitātes druka uz matēta papīra.',              'https://images.unsplash.com/photo-1519741497674-611481863552?w=600&q=80', 1, 1),
+  ROW('Fotodruka 40×60',    'Druka',   'druka',   1,  '40×60 cm',  'portrait', 55.00, 'Liela formāta druka uz glossy papīra.',                   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', 0, 1),
+  ROW('Canvas 50×70',       'Canvas',  'canvas',  1,  '50×70 cm',  'portrait', 79.00, 'Audekla druka ar rāmi, gatava karināšanai.',              'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80', 1, 1),
+  ROW('Canvas 80×120',      'Canvas',  'canvas',  1,  '80×120 cm', 'portrait', 139.00,'Liela formāta audekla druka.',                            'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80', 0, 1),
+  ROW('Alumīnija panelis',  'Panelis', 'panelis', 1,  '60×90 cm',  'portrait', 149.00,'Spīdīgs alumīnija panelis, moderns dizains.',             'https://images.unsplash.com/photo-1551376347-075b0121a65b?w=600&q=80', 0, 1),
+  ROW('Mini albums 10 foto','Albums',  'albums',  10, '15×15 cm',  'square',   69.00, 'Mīkstie vāki, 10 lapas (20 foto vietas), 15×15 cm.',     'https://images.unsplash.com/photo-1548267464-c0c4f39e3e0f?w=600&q=80', 0, 1),
+  ROW('Albums 20 foto',     'Albums',  'albums',  20, '20×20 cm',  'square',   99.00, 'Cietie vāki, 20 lapas (40 foto vietas), 20×20 cm.',      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', 1, 1),
+  ROW('Albums 30 foto',     'Albums',  'albums',  30, '25×25 cm',  'square',   129.00,'Premium cietie vāki, 30 lapas, 25×25 cm.',                'https://images.unsplash.com/photo-1519741497674-611481863552?w=600&q=80', 0, 1),
+  ROW('Lielais albums 50',  'Albums',  'albums',  50, '30×30 cm',  'square',   189.00,'Luksusa izdevums, 50 lapas, ādas vāki, 30×30 cm.',        'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80', 0, 1)
+) AS v(nosaukums, kategorija, tips, foto_skaits, izmers, orientacija, cena, apraksts, attels_url, bestseller, aktivs)
+WHERE NOT EXISTS (SELECT 1 FROM `preces` WHERE `preces`.nosaukums = v.nosaukums);
+
+-- pasutijumi tabula - pievieno foto_urls JSON kolonu
+ALTER TABLE `pasutijumi` ADD COLUMN IF NOT EXISTS `foto_urls`  text DEFAULT NULL AFTER `foto_fails`;

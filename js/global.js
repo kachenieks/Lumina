@@ -204,14 +204,21 @@ function loadGlobalCartItems() {
       let html = '', total = 0;
       data.items.forEach(item => {
         total += item.cena * item.qty;
-        html += `<div style="display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #f5f0e8;">
+        const thumb = item.is_foto && item.foto_url
+          ? `<img src="${item.foto_url}" style="width:48px;height:48px;object-fit:cover;border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">`
+          : `<div style="width:48px;height:48px;background:var(--cream2,#f3eee6);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;opacity:.4;">${item.is_foto?'🖼️':'📦'}</div>`;
+        const subtext = item.is_foto
+          ? `<div style="font-size:10px;color:#B8975A;margin-top:2px;">Personalizēts foto</div>`
+          : `<div style="font-size:11px;color:#aaa;">× ${item.qty}</div>`;
+        html += `<div style="display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #f5f0e8;">
+          ${thumb}
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;color:#1C1C1C;margin-bottom:2px;">${item.name}</div>
-            <div style="font-size:11px;color:#aaa;">× ${item.qty}</div>
+            <div style="font-size:13px;color:#1C1C1C;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</div>
+            ${subtext}
           </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-            <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:#B8975A;">€${(item.cena*item.qty).toFixed(2)}</div>
-            <button onclick="removeFromGlobalCart(${item.id})" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;padding:2px 4px;line-height:1;" title="Noņemt">×</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:19px;color:#B8975A;">€${(item.cena*item.qty).toFixed(2)}</div>
+            <button onclick="removeFromGlobalCart('${item.id}')" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;padding:2px 4px;line-height:1;" title="Noņemt">×</button>
           </div>
         </div>`;
       });

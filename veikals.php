@@ -37,6 +37,52 @@ if (isset($_GET['action'])) {
   }
 }
 
+// ── Pievienot foto pasūtījumu grozam (AJAX POST) ──────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart'])) {
+  header('Content-Type: application/json');
+  if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
+
+  $produktsName = escape($savienojums, $_POST['produkts'] ?? '');
+  $cena  = (float)($_POST['cena'] ?? 0);
+  $notes = escape($savienojums, $_POST['notes'] ?? '');
+  $crop  = escape($savienojums, $_POST['crop_data'] ?? '');
+  $galUrl = escape($savienojums, $_POST['gallery_url'] ?? '');
+
+  $fotoUrl = '';
+  // Upload file if provided
+  if (!empty($_FILES['foto']['name'])) {
+    $uploadDir = __DIR__ . '/uploads/pasutijumi/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+    $ext = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
+    if (in_array($ext, ['jpg','jpeg','png','webp'])) {
+      $filename = 'foto_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $filename)) {
+        $fotoUrl = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $filename;
+      }
+    }
+  } elseif (!empty($galUrl)) {
+    $fotoUrl = $galUrl;
+  }
+
+  // Add to cart with unique photo key
+  $cartKey = 'foto_' . uniqid();
+  $_SESSION['cart'][$cartKey] = [
+    'qty'       => 1,
+    'name'      => strip_tags($produktsName),
+    'cena'      => $cena,
+    'is_foto'   => true,
+    'foto_url'  => $fotoUrl,
+    'notes'     => strip_tags($notes),
+    'crop_data' => $crop,
+  ];
+
+  echo json_encode([
+    'ok'    => true,
+    'count' => array_sum(array_column($_SESSION['cart'], 'qty')),
+  ]);
+  exit;
+}
+
 // Handle upload/order
 $uploadSuccess = '';
 $uploadError = '';
@@ -297,10 +343,10 @@ if (isset($_SESSION['klients_id'])) {
 
     <!-- Topbar -->
     <div class="editor-topbar">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--ink);">✦ Foto Editors</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--ink);">✦ Foto editors</div>
       <div style="display:flex;gap:12px;align-items:center;">
         <button class="btn-outline" style="padding:8px 18px;font-size:12px;" onclick="closeModal('photoEditorModal')">← Atpakaļ</button>
-        <button class="btn-primary" style="padding:8px 22px;font-size:12px;" id="orderBtn" onclick="submitOrder()" disabled>Pasūtīt →</button>
+        <button class="btn-primary" style="padding:8px 22px;font-size:12px;" id="orderBtn" onclick="addPhotoToCart()" disabled>Pievienot grozam →</button>
       </div>
     </div>
 
@@ -692,34 +738,72 @@ function checkOrderReady(){
   btn.disabled=!ready;btn.style.opacity=ready?'1':'0.4';
 }
 
-function submitOrder(){
+function addPhotoToCart(){
   if(!loadedImage||!selectedProduct)return;
 
-  // Validate guest email if not logged in
-  const guestEmailEl=document.getElementById('guestEmail');
-  if(guestEmailEl){
-    const em=guestEmailEl.value.trim();
-    if(!em||!em.includes('@')){
-      showToast('Lūdzu ievadiet e-pasta adresi!','error');
-      guestEmailEl.focus();
-      guestEmailEl.style.borderColor='#C0392B';
-      return;
-    }
-    document.getElementById('formGuestEmail').value=em;
-  }
+  const btn=document.getElementById('orderBtn');
+  btn.textContent='Pievieno...';btn.disabled=true;
 
   const cropData=JSON.stringify({
     zoom:document.getElementById('zoomSlider').value,
     posX:document.getElementById('posX').value,
     posY:document.getElementById('posY').value,
     rot:document.getElementById('rotSlider').value,
-    product:selectedProduct.type,
-    src:loadedFile?null:loadedImage
+    type:selectedProduct.type
   });
-  document.getElementById('formProdukts').value=selectedProduct.name+' — €'+selectedProduct.price;
-  document.getElementById('formNotes').value=document.getElementById('orderNotes').value;
-  document.getElementById('formCropData').value=cropData;
-  document.getElementById('orderForm').submit();
+  const notes=document.getElementById('orderNotes').value;
+
+  const formData=new FormData();
+  formData.append('add_photo_to_cart','1');
+  formData.append('produkts', selectedProduct.name+' — €'+selectedProduct.price);
+  formData.append('cena', selectedProduct.price);
+  formData.append('notes', notes);
+  formData.append('crop_data', cropData);
+  // Attach file if uploaded from device
+  const fileInput=document.getElementById('formFotoInput');
+  if(fileInput && fileInput.files[0]) {
+    formData.append('foto', fileInput.files[0]);
+  } else if(loadedImage && loadedImage.startsWith('data:')) {
+    // base64 image - convert to blob
+    const blob=dataURLtoBlob(loadedImage);
+    formData.append('foto', blob, 'foto.jpg');
+  } else if(loadedImage) {
+    formData.append('gallery_url', loadedImage);
+  }
+
+  fetch('/4pt/blazkova/lumina/Lumina/veikals.php', {method:'POST', body:formData})
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.ok){
+        document.getElementById('cartCount').textContent=data.count;
+        closeModal('photoEditorModal');
+        showToast(selectedProduct.name+' pievienots grozam ✓','success');
+        // Reset editor state
+        loadedImage=null;loadedFile=null;selectedProduct=null;
+        document.getElementById('photoWrap').style.display='none';
+        document.getElementById('photoBg').src='';
+        document.getElementById('photoPlaceholder').style.display='flex';
+        document.getElementById('editorControls').style.display='none';
+        document.querySelectorAll('.product-option').forEach(l=>l.classList.remove('selected'));
+        resetTransform();
+      } else {
+        showToast(data.error||'Kļūda pievienojot grozam','error');
+      }
+      btn.textContent='Pievienot grozam →';btn.disabled=false;
+    }).catch(()=>{
+      showToast('Savienojuma kļūda','error');
+      btn.textContent='Pievienot grozam →';btn.disabled=false;
+    });
+}
+
+function dataURLtoBlob(dataURL){
+  const arr=dataURL.split(',');
+  const mime=arr[0].match(/:(.*?);/)[1];
+  const bstr=atob(arr[1]);
+  let n=bstr.length;
+  const u8arr=new Uint8Array(n);
+  while(n--) u8arr[n]=bstr.charCodeAt(n);
+  return new Blob([u8arr],{type:mime});
 }
 
 // ── Drag to move photo ───────────────────

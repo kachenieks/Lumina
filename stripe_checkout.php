@@ -74,9 +74,12 @@ if ($action === 'create_checkout') {
   $params['cancel_url']              = SITE_BASE . '/veikals.php?cancelled=1';
   $params['metadata[order_id]']      = $orderId;
   $params['metadata[klients_id]']    = (int)($_SESSION['klients_id'] ?? 0);
+  // Pre-fill email for logged in users
   if (!empty($_SESSION['klients_epasts'])) {
     $params['customer_email'] = $_SESSION['klients_epasts'];
   }
+  // Always collect billing details so we get customer email for guests
+  $params['billing_address_collection'] = 'auto';
 
   $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
   curl_setopt_array($ch, [
@@ -109,13 +112,34 @@ if ($action === 'create_checkout') {
 
 // ── Veiksmīgs maksājums ──────────────────────────
 if ($action === 'success') {
-  header('Content-Type: text/html'); // redirect, not JSON
-  $orderId = $_GET['order'] ?? ($_SESSION['pending_order_id'] ?? '');
+  header('Content-Type: text/html');
+  $orderId   = $_GET['order'] ?? ($_SESSION['pending_order_id'] ?? '');
+  $sessionId = $_GET['session_id'] ?? '';
 
   if (!empty($orderId) && !empty($_SESSION['cart'])) {
     $klientsId    = (int)($_SESSION['klients_id'] ?? 0);
     $klientaVards = $_SESSION['klients_vards'] ?? 'Klients';
     $klientaEmail = $_SESSION['klients_epasts'] ?? '';
+
+    // Ja viesis — iegūst e-pastu no Stripe session
+    if (empty($klientaEmail) && !empty($sessionId) && strpos(STRIPE_KEY, 'IEVIETO') === false) {
+      $ch = curl_init('https://api.stripe.com/v1/checkout/sessions/' . urlencode($sessionId));
+      curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_USERPWD        => STRIPE_KEY . ':',
+        CURLOPT_TIMEOUT        => 10,
+      ]);
+      $sBody = curl_exec($ch);
+      curl_close($ch);
+      $sData = json_decode($sBody, true);
+      // Stripe returns customer_email or customer_details.email
+      $klientaEmail = $sData['customer_email']
+        ?? $sData['customer_details']['email']
+        ?? '';
+      if ($klientaEmail && $klientaVards === 'Klients') {
+        $klientaVards = explode('@', $klientaEmail)[0];
+      }
+    }
 
     $items = []; $total = 0;
     foreach ($_SESSION['cart'] as $item) {
@@ -125,26 +149,29 @@ if ($action === 'success') {
 
     $oidEsc   = escape($savienojums, $orderId);
     $totalFmt = number_format($total, 2);
-    @mysqli_query($savienojums,
-      "INSERT IGNORE INTO pasutijumi (klienta_id, produkts, foto_fails, papildu_info, statuss, izveidots)
-       VALUES ($klientsId, '$oidEsc', '', 'Stripe €$totalFmt', 'apmaksats', NOW())"
-    );
+
+    // Save each cart item to pasutijumi table
+    foreach ($_SESSION['cart'] as $cartItem) {
+      $prod  = escape($savienojums, $cartItem['name'] ?? '');
+      $foto  = escape($savienojums, $cartItem['foto_url'] ?? '');
+      $notes = escape($savienojums, $cartItem['notes'] ?? ('Stripe #' . $orderId . ' €' . $totalFmt));
+      $crop  = escape($savienojums, $cartItem['crop_data'] ?? '');
+      @mysqli_query($savienojums,
+        "INSERT INTO pasutijumi (klienta_id, produkts, foto_fails, crop_data, papildu_info, statuss, izveidots)
+         VALUES ($klientsId, '$prod', '$foto', '$crop', '$notes', 'apmaksats', NOW())"
+      );
+    }
+
     if ($klientsId) {
       @mysqli_query($savienojums, "UPDATE klienti SET kopeja_summa = kopeja_summa + $total WHERE id=$klientsId");
     }
 
-    // Send emails — only if PHPMailer library is uploaded
-    $mailerPath   = __DIR__ . '/includes/mailer.php';
-    $phpmailerOk  = file_exists(__DIR__ . '/PHPMailer/src/PHPMailer.php');
-    if ($phpmailerOk && file_exists($mailerPath)) {
-      try {
-        require_once $mailerPath;
-        if ($klientaEmail && function_exists('mailPasutijumsKlients'))
-          mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
-        if (function_exists('mailPasutijumsAdmin'))
-          mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
-      } catch (\Throwable $e) { error_log('Stripe mail error: ' . $e->getMessage()); }
-    }
+    // Send emails
+    try {
+      require_once __DIR__ . '/includes/mailer.php';
+      if ($klientaEmail) mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
+      mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+    } catch (\Throwable $e) { error_log('Stripe mail error: ' . $e->getMessage()); }
 
     $_SESSION['cart'] = [];
     unset($_SESSION['pending_order_id']);

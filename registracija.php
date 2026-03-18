@@ -49,9 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['klients_id']    = $id;
         $_SESSION['klients_vards'] = $vards;
         $_SESSION['klients_epasts']= $epasts;
-        // PHPMailer — reģistrācijas apstiprinājums
-        require_once __DIR__ . '/includes/mailer.php';
-        mailRegistracija($epasts, $vards);
+        // E-pasta apstiprinājums
+        try { require_once __DIR__ . '/includes/mailer.php'; mailRegistracija($epasts, $vards); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
         header('Location: /4pt/blazkova/lumina/Lumina/profils.php');
         exit;
       } else {

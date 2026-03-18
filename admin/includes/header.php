@@ -27,6 +27,7 @@ $adminPage = basename($_SERVER['PHP_SELF'], '.php');
     <a href="/4pt/blazkova/lumina/Lumina/admin/rezervacijas.php" class="sidebar-item <?= $adminPage==='rezervacijas'?'active':'' ?>"><span class="sidebar-icon">📅</span> Rezervācijas</a>
     <a href="/4pt/blazkova/lumina/Lumina/admin/klienti.php"      class="sidebar-item <?= $adminPage==='klienti'     ?'active':'' ?>"><span class="sidebar-icon">👤</span> Klienti</a>
     <a href="/4pt/blazkova/lumina/Lumina/admin/preces.php"       class="sidebar-item <?= $adminPage==='preces'      ?'active':'' ?>"><span class="sidebar-icon">🛍</span> Veikals</a>
+    <a href="/4pt/blazkova/lumina/Lumina/admin/pasutijumi.php"   class="sidebar-item <?= $adminPage==='pasutijumi'  ?'active':'' ?>"><span class="sidebar-icon">🖼</span> Foto pasūtījumi</a>
     <a href="/4pt/blazkova/lumina/Lumina/admin/portfolio.php"    class="sidebar-item <?= $adminPage==='portfolio'   ?'active':'' ?>"><span class="sidebar-icon">🖼</span> Portfolio</a>
     <a href="/4pt/blazkova/lumina/Lumina/admin/galerijas.php"    class="sidebar-item <?= $adminPage==='galerijas'   ?'active':'' ?>"><span class="sidebar-icon">🗂</span> Galerijas</a>
   </nav>
