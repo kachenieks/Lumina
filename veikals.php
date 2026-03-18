@@ -43,37 +43,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart']))
   if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
 
   $produktsName = escape($savienojums, $_POST['produkts'] ?? '');
-  $cena  = (float)($_POST['cena'] ?? 0);
-  $notes = escape($savienojums, $_POST['notes'] ?? '');
-  $crop  = escape($savienojums, $_POST['crop_data'] ?? '');
-  $galUrl = escape($savienojums, $_POST['gallery_url'] ?? '');
+  $cena         = (float)($_POST['cena'] ?? 0);
+  $notes        = strip_tags($_POST['notes'] ?? '');
+  $guestEmail   = filter_var($_POST['guest_email'] ?? '', FILTER_VALIDATE_EMAIL) ?: '';
 
-  $fotoUrl = '';
-  // Upload file if provided
-  if (!empty($_FILES['foto']['name'])) {
-    $uploadDir = __DIR__ . '/uploads/pasutijumi/';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-    $ext = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
-    if (in_array($ext, ['jpg','jpeg','png','webp'])) {
-      $filename = 'foto_' . uniqid() . '.' . $ext;
-      if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $filename)) {
-        $fotoUrl = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $filename;
+  $uploadDir = __DIR__ . '/uploads/pasutijumi/';
+  if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+  $allFotoUrls = [];
+
+  // Handle multiple uploaded files (fotos[])
+  if (!empty($_FILES['fotos']['name'][0])) {
+    foreach ($_FILES['fotos']['tmp_name'] as $k => $tmp) {
+      if (!$tmp || !is_uploaded_file($tmp)) continue;
+      $origName = $_FILES['fotos']['name'][$k] ?? 'foto.jpg';
+      $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+      if (!in_array($ext, ['jpg','jpeg','png','webp'])) continue;
+      $fname = 'f_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($tmp, $uploadDir . $fname)) {
+        $allFotoUrls[] = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $fname;
       }
     }
-  } elseif (!empty($galUrl)) {
-    $fotoUrl = $galUrl;
   }
 
-  // Add to cart with unique photo key
+  // Handle gallery URLs
+  if (!empty($_POST['gallery_urls'])) {
+    $gals = json_decode($_POST['gallery_urls'], true) ?: [];
+    foreach ($gals as $u) {
+      if (filter_var($u, FILTER_VALIDATE_URL)) $allFotoUrls[] = $u;
+    }
+  }
+
+  // Single legacy foto field
+  if (empty($allFotoUrls) && !empty($_FILES['foto']['tmp_name'])) {
+    $ext = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
+    if (in_array($ext, ['jpg','jpeg','png','webp'])) {
+      $fname = 'f_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $fname)) {
+        $allFotoUrls[] = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $fname;
+      }
+    }
+  }
+
+  if (empty($allFotoUrls)) {
+    echo json_encode(['error' => 'Nav pievienotu fotogrāfiju']); exit;
+  }
+
   $cartKey = 'foto_' . uniqid();
   $_SESSION['cart'][$cartKey] = [
-    'qty'       => 1,
-    'name'      => strip_tags($produktsName),
-    'cena'      => $cena,
-    'is_foto'   => true,
-    'foto_url'  => $fotoUrl,
-    'notes'     => strip_tags($notes),
-    'crop_data' => $crop,
+    'qty'        => 1,
+    'name'       => strip_tags($produktsName),
+    'cena'       => $cena,
+    'is_foto'    => true,
+    'foto_url'   => $allFotoUrls[0],
+    'foto_urls'  => json_encode($allFotoUrls),
+    'notes'      => $notes,
+    'guest_email'=> $guestEmail,
   ];
 
   echo json_encode([
@@ -138,8 +163,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
   }
 }
 
+// Ensure new columns exist (safe on any MySQL version)
+@mysqli_query($savienojums, "ALTER TABLE preces ADD COLUMN IF NOT EXISTS tips         varchar(50)  DEFAULT 'druka'");
+@mysqli_query($savienojums, "ALTER TABLE preces ADD COLUMN IF NOT EXISTS foto_skaits  int(3)       DEFAULT 1");
+@mysqli_query($savienojums, "ALTER TABLE preces ADD COLUMN IF NOT EXISTS izmers       varchar(100) DEFAULT ''");
+@mysqli_query($savienojums, "ALTER TABLE preces ADD COLUMN IF NOT EXISTS orientacija  varchar(20)  DEFAULT 'portrait'");
+
 // Products
-$result = mysqli_query($savienojums, "SELECT * FROM preces WHERE aktivs = 1 ORDER BY bestseller DESC, id ASC");
+$result = mysqli_query($savienojums, "SELECT * FROM preces WHERE aktivs = 1 ORDER BY kategorija ASC, cena ASC");
 $products = [];
 while ($row = mysqli_fetch_assoc($result)) $products[] = $row;
 
@@ -264,17 +295,23 @@ if (isset($_SESSION['klients_id'])) {
   <div class="shop-grid">
     <?php foreach ($products as $i => $p): ?>
     <?php $imgSrc = !empty($p['attels_url']) ? (filter_var($p['attels_url'], FILTER_VALIDATE_URL) ? $p['attels_url'] : '/4pt/blazkova/lumina/Lumina/uploads/preces/'.$p['attels_url']) : 'https://images.unsplash.com/photo-1519741497674-611481863552?w=500&q=80'; ?>
-    <div class="product-card reveal reveal-delay-<?= ($i%3)+1 ?>" onclick="openProductModal(<?= $i ?>)">
+    <?php $fotoN = (int)($p['foto_skaits'] ?? 1); ?>
+    <div class="product-card reveal reveal-delay-<?= ($i%3)+1 ?>" onclick="openPhotoEditor(<?= $p['id'] ?>)">
       <div class="product-img">
         <img src="<?= htmlspecialchars($imgSrc) ?>" alt="<?= htmlspecialchars($p['nosaukums']) ?>">
         <?php if ($p['bestseller']): ?><div class="product-tag">Bestseller</div><?php endif; ?>
+        <?php if ($fotoN > 1): ?>
+        <div class="product-tag" style="top:auto;bottom:10px;left:10px;background:rgba(28,28,28,.75);"><?= $fotoN ?> foto</div>
+        <?php endif; ?>
         <div class="product-overlay">
-          <button class="add-cart-btn" onclick="event.stopPropagation();addToCartAjax(<?= $p['id'] ?>,'<?= htmlspecialchars(addslashes($p['nosaukums'])) ?>')">Pievienot →</button>
+          <button class="add-cart-btn" onclick="event.stopPropagation();openPhotoEditor(<?= $p['id'] ?>)">
+            <?= $fotoN > 1 ? 'Pievienot ' . $fotoN . ' foto →' : 'Pievienot foto →' ?>
+          </button>
         </div>
       </div>
       <div class="product-name"><?= htmlspecialchars($p['nosaukums']) ?></div>
       <div class="product-price">€<?= number_format($p['cena'],0) ?></div>
-      <div class="product-sub"><?= htmlspecialchars($p['kategorija']) ?></div>
+      <div class="product-sub"><?= htmlspecialchars($p['kategorija']) ?><?= !empty($p['izmers']) ? ' · ' . htmlspecialchars($p['izmers']) : '' ?></div>
     </div>
     <?php endforeach; ?>
   </div>
@@ -288,13 +325,11 @@ if (isset($_SESSION['klients_id'])) {
       Redziet, kā izskatīsies<br><em style="font-style:italic;color:var(--gold)">jūsu foto uz sienas</em>
     </h2>
     <p style="font-size:14px;color:var(--grey);max-width:500px;margin:0 auto 32px;line-height:1.8;">
-      Augšupielādējiet fotogrāfiju, izvēlieties produktu un skatiet priekšskatījumu reāllaikā. Velciet, tālummaino un koriģējiet.
+      Izvēlieties produktu, augšupielādējiet fotogrāfijas un skatiet priekšskatījumu reāllaikā.
     </p>
     <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
-      <button class="btn-primary" onclick="openPhotoEditor()">✦ Atvērt Foto Editoru</button>
-      <?php if (isset($_SESSION['klients_id']) && !empty($clientPhotos)): ?>
-      <button class="btn-outline" onclick="openModal('galleryPickerModal')">Izvēlēties no manām galerijām</button>
-      <?php elseif (!isset($_SESSION['klients_id'])): ?>
+      <button class="btn-primary" onclick="openPhotoEditor(<?= !empty($products) ? $products[0]['id'] : 0 ?>)">✦ Pasūtīt ar savu foto</button>
+      <?php if (!isset($_SESSION['klients_id'])): ?>
       <a href="/4pt/blazkova/lumina/Lumina/login.php" class="btn-outline">Pieslēgties — skatīt savas galerijas →</a>
       <?php endif; ?>
     </div>
@@ -328,13 +363,13 @@ if (isset($_SESSION['klients_id'])) {
       <div id="prodModalDesc" style="font-size:14px;line-height:1.8;color:var(--grey);margin-bottom:22px;"></div>
       <div id="prodModalPrice" style="font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--gold);margin-bottom:20px;"></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <button id="prodModalBtn" class="btn-primary">Pievienot Grozam →</button>
-        <button class="btn-outline" onclick="closeModal('productModal');openPhotoEditor()">Pielāgot ar manu foto →</button>
+        <button id="prodModalBtn" class="btn-primary">Pasūtīt ar manu foto →</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════ -->
 <!-- ══════════════════════════════════════════════════ -->
 <!-- FOTO EDITORS — fullscreen modal -->
 <!-- ══════════════════════════════════════════════════ -->
@@ -343,125 +378,123 @@ if (isset($_SESSION['klients_id'])) {
 
     <!-- Topbar -->
     <div class="editor-topbar">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--ink);">✦ Foto editors</div>
-      <div style="display:flex;gap:12px;align-items:center;">
-        <button class="btn-outline" style="padding:8px 18px;font-size:12px;" onclick="closeModal('photoEditorModal')">← Atpakaļ</button>
-        <button class="btn-primary" style="padding:8px 22px;font-size:12px;" id="orderBtn" onclick="addPhotoToCart()" disabled>Pievienot grozam →</button>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--ink);">✦ Foto editors</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <!-- Photo counter badge -->
+        <div id="editorCountBadge" style="font-size:11px;padding:6px 14px;background:var(--cream2);color:var(--grey);display:none;">
+          <span id="editorCountNow">0</span> / <span id="editorCountNeed">1</span> foto
+        </div>
+        <button class="btn-outline" style="padding:8px 16px;font-size:11px;" onclick="closeModal('photoEditorModal')">← Atpakaļ</button>
+        <button class="btn-primary" style="padding:8px 20px;font-size:11px;" id="orderBtn" onclick="addPhotoToCart()" disabled>Pievienot grozam →</button>
       </div>
     </div>
 
     <!-- Main editor area -->
     <div class="editor-layout" style="flex:1;overflow:hidden;">
 
-      <!-- LEFT: Controls -->
+      <!-- LEFT: Controls sidebar -->
       <div class="editor-sidebar" style="overflow-y:auto;height:100%;">
 
-        <!-- Step 1 -->
+        <!-- Step 1: Upload photos -->
         <div class="editor-step">
           <div class="editor-step-num">01</div>
           <div class="editor-step-title">Pievienojiet foto</div>
+          <div id="editorUploadStatus" style="font-size:12px;color:var(--grey);margin-bottom:10px;">
+            Augšupielādējiet nepieciešamās fotogrāfijas
+          </div>
 
+          <!-- Upload tabs -->
           <?php if (isset($_SESSION['klients_id']) && !empty($clientPhotos)): ?>
           <div class="editor-tabs">
             <button class="editor-tab active" onclick="switchTab('upload')">Augšupielādēt</button>
-            <button class="editor-tab" onclick="switchTab('gallery')">Manas galerijas</button>
+            <button class="editor-tab" onclick="switchTab('gallery')">Manas galerijas (<?= count($clientPhotos) ?>)</button>
           </div>
           <?php endif; ?>
 
           <div id="tabUpload">
             <div class="editor-dropzone" id="editorDropzone" onclick="document.getElementById('editorFileInput').click()">
-              <input type="file" id="editorFileInput" accept="image/*" style="display:none;" onchange="loadPhoto(this.files[0])">
-              <div class="dropzone-icon">📷</div>
-              <div class="dropzone-text">Ievilciet foto šeit</div>
-              <div class="dropzone-sub">vai noklikšķiniet · JPG, PNG · max 15MB</div>
-            </div>
-            <div id="photoLoaded" style="display:none;padding:10px;background:rgba(184,151,90,.08);border-radius:8px;border:1px solid rgba(184,151,90,.3);font-size:12px;color:var(--gold);text-align:center;">
-              ✓ Foto ielādēts — koriģējiet labajā pusē
+              <input type="file" id="editorFileInput" accept="image/*" multiple style="display:none;" onchange="handleFileInput(this.files)">
+              <div class="dropzone-icon" style="font-size:28px;margin-bottom:8px;">📷</div>
+              <div class="dropzone-text" style="font-size:13px;">Velciet foto šeit vai klikšķiniet</div>
+              <div class="dropzone-sub" style="font-size:11px;color:var(--grey);margin-top:4px;">Var izvēlēties vairākas bildes uzreiz</div>
             </div>
           </div>
 
           <?php if (isset($_SESSION['klients_id']) && !empty($clientPhotos)): ?>
           <div id="tabGallery" style="display:none;">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:260px;overflow-y:auto;">
+            <div style="font-size:11px;color:var(--grey);margin-bottom:8px;">Klikšķiniet lai pievienotu/noņemtu</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-height:240px;overflow-y:auto;">
               <?php foreach ($clientPhotos as $cp):
-                $ps = filter_var($cp['attels_url']??'', FILTER_VALIDATE_URL) ? $cp['attels_url'] : '/4pt/blazkova/lumina/Lumina/uploads/galerijas/'.($cp['attels_url']??'');
+                $ps = filter_var($cp['attels_url']??'', FILTER_VALIDATE_URL)
+                  ? $cp['attels_url']
+                  : '/4pt/blazkova/lumina/Lumina/uploads/galerijas/'.($cp['attels_url']??'');
               ?>
-              <div class="gallery-thumb" onclick="loadPhotoFromUrl('<?= htmlspecialchars($ps) ?>')">
-                <img src="<?= htmlspecialchars($ps) ?>" alt="">
-                <div class="gallery-thumb-overlay">Izvēlēties</div>
+              <div class="gallery-thumb gal-pick" onclick="toggleGalleryPick(this,'<?= htmlspecialchars($ps) ?>')"
+                   data-url="<?= htmlspecialchars($ps) ?>"
+                   style="position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.2s;">
+                <img src="<?= htmlspecialchars($ps) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+                <div class="gal-pick-check" style="display:none;position:absolute;inset:0;background:rgba(184,151,90,.6);color:#fff;font-size:20px;align-items:center;justify-content:center;">✓</div>
               </div>
               <?php endforeach; ?>
             </div>
           </div>
           <?php endif; ?>
+
+          <!-- Uploaded photo thumbs -->
+          <div id="uploadedThumbs" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px;"></div>
         </div>
 
-        <!-- Step 2 -->
-        <div class="editor-step">
+        <!-- Step 2: Edit current photo (shown when photo loaded) -->
+        <div class="editor-step" id="editStep" style="display:none;">
           <div class="editor-step-num">02</div>
-          <div class="editor-step-title">Izvēlieties produktu</div>
-          <div class="product-options">
-            <label class="product-option" onclick="selectProduct(this,'Fotodruka 30×40 cm','29','print_30x40')">
-              <input type="radio" name="pt">
-              <div class="product-option-inner">
-                <div class="product-option-name">Fotodruka 30×40</div>
-                <div class="product-option-price">€29</div>
-                <div class="product-option-desc">Augstas kvalitātes drukas papīrs</div>
-              </div>
-            </label>
-            <label class="product-option" onclick="selectProduct(this,'Canvas 50×70 cm','79','canvas_50x70')">
-              <input type="radio" name="pt">
-              <div class="product-option-inner">
-                <div class="product-option-name">Canvas 50×70</div>
-                <div class="product-option-price">€79</div>
-                <div class="product-option-desc">Audekls uz rāmja · gatavs karšanai</div>
-              </div>
-            </label>
-            <label class="product-option" onclick="selectProduct(this,'Canvas 80×120 cm','139','canvas_80x120')">
-              <input type="radio" name="pt">
-              <div class="product-option-inner">
-                <div class="product-option-name">Canvas 80×120</div>
-                <div class="product-option-price">€139</div>
-                <div class="product-option-desc">Liela formāta audekls</div>
-              </div>
-            </label>
-            <label class="product-option" onclick="selectProduct(this,'Sienas panelis 60×90 cm','149','panel_60x90')">
-              <input type="radio" name="pt">
-              <div class="product-option-inner">
-                <div class="product-option-name">Sienas panelis 60×90</div>
-                <div class="product-option-price">€149</div>
-                <div class="product-option-desc">Alumīnija panelis · spīdīgs</div>
-              </div>
-            </label>
-            <label class="product-option" onclick="selectProduct(this,'Fotogrāmata 30×30 cm','129','book_30x30')">
-              <input type="radio" name="pt">
-              <div class="product-option-inner">
-                <div class="product-option-name">Fotogrāmata 30×30</div>
-                <div class="product-option-price">€129</div>
-                <div class="product-option-desc">Cietie vāki · 30 lapas iekļautas</div>
-              </div>
-            </label>
+          <div class="editor-step-title">Rediģēt kadru</div>
+          <div style="font-size:11px;color:var(--grey);margin-bottom:12px;">
+            Velciet foto labajā pusē · Izmantojiet slīdņus kadrēšanai
+          </div>
+          <!-- Sliders inline for space -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
+              <input type="range" id="zoomSlider" min="10" max="300" value="100" class="dark-slider" style="flex:1;" oninput="applyTransform()">
+              <span id="zoomVal" style="font-size:10px;color:var(--gold);width:36px;text-align:right;font-family:monospace;">100%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--grey)" stroke-width="2"><path d="M5 12h14M15 8l4 4-4 4M9 8l-4 4 4 4"/></svg>
+              <input type="range" id="posX" min="-200" max="200" value="0" class="dark-slider" style="flex:1;" oninput="applyTransform()">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--grey)" stroke-width="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4"/></svg>
+              <input type="range" id="posY" min="-200" max="200" value="0" class="dark-slider" style="flex:1;" oninput="applyTransform()">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--grey)" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+              <input type="range" id="rotSlider" min="-180" max="180" value="0" class="dark-slider" style="flex:1;" oninput="applyTransform()">
+              <span id="rotVal" style="font-size:10px;color:var(--gold);width:36px;text-align:right;font-family:monospace;">0°</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <button onclick="resetTransform()" style="flex:1;padding:7px;font-size:10px;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--grey3);background:var(--white);cursor:pointer;color:var(--grey);">Atiestatīt</button>
+            <button onclick="fitPhoto()" style="flex:1;padding:7px;font-size:10px;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--gold-border);background:var(--gold-dim);cursor:pointer;color:var(--gold);">Pielāgot</button>
           </div>
         </div>
 
-        <!-- Step 3 -->
+        <!-- Step 3: Notes + summary -->
         <div class="editor-step">
-          <div class="editor-step-num">03</div>
+          <div class="editor-step-num" id="notesStepNum">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
-          <textarea id="orderNotes" class="form-textarea" style="height:80px;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
+          <textarea id="orderNotes" class="form-textarea" style="height:70px;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
 
           <?php if (!isset($_SESSION['klients_id'])): ?>
-          <!-- Guest email field -->
           <div style="margin-top:12px;">
             <label style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:7px;">E-pasts *</label>
-            <input type="email" id="guestEmail" class="form-input" style="width:100%;font-size:13px;" placeholder="tavs@epasts.lv" required>
-            <div style="font-size:10px;color:var(--grey);margin-top:5px;">Apstiprinājumu nosūtīsim uz šo adresi</div>
+            <input type="email" id="guestEmail" class="form-input" style="width:100%;font-size:13px;" placeholder="tavs@epasts.lv">
+            <div style="font-size:10px;color:var(--grey);margin-top:4px;">Apstiprinājumu nosūtīsim uz šo adresi</div>
           </div>
           <?php endif; ?>
 
-          <div style="margin-top:12px;padding:14px;background:var(--cream2,#f5f3ef);border-radius:6px;">
+          <div style="margin-top:12px;padding:13px;background:var(--cream2);">
             <div style="font-size:10px;color:var(--grey);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Kopsavilkums</div>
-            <div id="summaryProduct" style="font-size:13px;color:var(--ink);margin-bottom:4px;">— izvēlieties produktu —</div>
+            <div id="summaryProduct" style="font-size:13px;color:var(--ink);margin-bottom:4px;">— izvēlieties produktu no grozam —</div>
             <div id="summaryPrice" style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--gold);"></div>
           </div>
         </div>
@@ -470,33 +503,22 @@ if (isset($_SESSION['klients_id'])) {
 
       <!-- RIGHT: Wall preview -->
       <div class="editor-preview-area" style="overflow:hidden;display:flex;flex-direction:column;height:100%;">
-        <div class="editor-preview-label">Priekšskatījums reāllaikā — velciet foto ar peli</div>
-        
+        <div class="editor-preview-label">Priekšskatījums — velciet foto ar peli</div>
+
         <div class="wall-scene" id="wallScene" style="flex:1;">
           <div class="wall-bg"></div>
           <div class="wall-frame-wrapper" id="wallFrameWrapper">
             <div class="wall-frame" id="wallFrame">
               <div class="frame-canvas-area" id="frameCanvasArea">
                 <div class="photo-container" id="photoContainer" style="cursor:grab;position:absolute;inset:0;overflow:hidden;background:#111;">
-                  <!-- Oversized wrapper: 4x frame size, centered. Pan never reveals black edges. -->
-                  <div id="photoWrap" style="
-                    display:none;
-                    position:absolute;
-                    width:400%; height:400%;
-                    top:-150%; left:-150%;
-                    transform-origin:center center;
-                  ">
-                    <img id="photoBg" src="" alt="" style="
-                      width:100%; height:100%;
-                      object-fit:cover;
-                      display:block;
-                    ">
+                  <div id="photoWrap" style="display:none;position:absolute;width:400%;height:400%;top:-150%;left:-150%;transform-origin:center center;">
+                    <img id="photoBg" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
                   </div>
                   <canvas id="photoCanvas" style="display:none;position:absolute;"></canvas>
                   <div class="photo-placeholder" id="photoPlaceholder">
                     <div style="text-align:center;color:rgba(255,255,255,.35);font-size:13px;">
-                      <div style="font-size:38px;margin-bottom:10px;">🖼️</div>
-                      Augšupielādējiet<br>fotogrāfiju
+                      <div style="font-size:32px;margin-bottom:8px;">🖼️</div>
+                      Augšupielādējiet fotogrāfiju
                     </div>
                   </div>
                 </div>
@@ -506,64 +528,14 @@ if (isset($_SESSION['klients_id'])) {
           </div>
         </div>
 
-        <!-- Controls panel -->
+        <!-- Controls panel (zoom range indicator) -->
         <div class="editor-controls" id="editorControls" style="display:none;">
-          <div class="ctrl-header">
-            <span>Pielāgot fotogrāfiju</span>
-          </div>
-          <div class="ctrl-body">
-            <!-- Zoom -->
-            <div class="ctrl-row">
-              <div class="ctrl-icon" title="Tālummaiņa">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
-              </div>
-              <input type="range" id="zoomSlider" min="50" max="300" value="100" class="dark-slider" oninput="applyTransform()">
-              <span id="zoomVal" class="ctrl-val">100%</span>
-            </div>
-            <!-- Horizontal -->
-            <div class="ctrl-row">
-              <div class="ctrl-icon" title="Horizontāli">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M15 8l4 4-4 4M9 8l-4 4 4 4"/></svg>
-              </div>
-              <input type="range" id="posX" min="-200" max="200" value="0" class="dark-slider" oninput="applyTransform()">
-              <span id="posXVal" class="ctrl-val muted">0</span>
-            </div>
-            <!-- Vertical -->
-            <div class="ctrl-row">
-              <div class="ctrl-icon" title="Vertikāli">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4"/></svg>
-              </div>
-              <input type="range" id="posY" min="-200" max="200" value="0" class="dark-slider" oninput="applyTransform()">
-              <span id="posYVal" class="ctrl-val muted">0</span>
-            </div>
-            <!-- Rotation -->
-            <div class="ctrl-row">
-              <div class="ctrl-icon" title="Rotācija">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
-              </div>
-              <input type="range" id="rotSlider" min="-180" max="180" value="0" class="dark-slider" oninput="applyTransform()">
-              <span id="rotVal" class="ctrl-val">0°</span>
-            </div>
-          </div>
-          <div class="ctrl-actions">
-            <button class="ctrl-btn ctrl-btn-reset" onclick="resetTransform()">↺ Atiestatīt</button>
-            <button class="ctrl-btn ctrl-btn-fit" onclick="fitPhoto()">⊡ Pielāgot rāmim</button>
-          </div>
+          <div class="ctrl-header"><span>Pielāgot fotogrāfiju</span></div>
+          <div class="ctrl-body" style="display:none;"></div><!-- sliders moved to sidebar -->
         </div>
 
       </div><!-- /preview -->
     </div><!-- /editor-layout -->
-
-    <!-- Hidden form -->
-    <form id="orderForm" method="POST" enctype="multipart/form-data" style="display:none;">
-      <input type="hidden" name="upload_order" value="1">
-      <input type="hidden" name="produkts" id="formProdukts">
-      <input type="hidden" name="notes" id="formNotes">
-      <input type="hidden" name="crop_data" id="formCropData">
-      <input type="hidden" name="gallery_url" id="formGalleryUrl">
-      <input type="hidden" name="guest_email" id="formGuestEmail">
-      <input type="file" name="foto" id="formFotoInput" accept="image/*">
-    </form>
 
   </div>
 </div>
@@ -604,19 +576,26 @@ if (isset($_SESSION['klients_id'])) {
 <script>
 const products = <?= json_encode(array_map(function($p){
   $src=!empty($p['attels_url'])?(filter_var($p['attels_url'],FILTER_VALIDATE_URL)?$p['attels_url']:'/4pt/blazkova/lumina/Lumina/uploads/preces/'.$p['attels_url']):'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80';
-  return['id'=>$p['id'],'img'=>$src,'cat'=>$p['kategorija'],'title'=>$p['nosaukums'],'desc'=>$p['apraksts'],'price'=>$p['cena']];
+  return[
+    'id'    => (int)$p['id'],
+    'img'   => $src,
+    'cat'   => $p['kategorija'],
+    'title' => $p['nosaukums'],
+    'desc'  => $p['apraksts'],
+    'price' => $p['cena'],
+    'fotos' => (int)($p['foto_skaits'] ?? 1),
+    'izmers'=> $p['izmers'] ?? '',
+    'orient'=> $p['orientacija'] ?? 'portrait',
+    'tips'  => $p['tips'] ?? 'druka',
+  ];
 },$products)) ?>;
 
-// ── Product modal ────────────────────────
+// ── Product modal — now opens editor directly ────────────
 function openProductModal(i){
-  const p=products[i];
-  document.getElementById('prodModalImg').src=p.img;
-  document.getElementById('prodModalCat').textContent=p.cat;
-  document.getElementById('prodModalTitle').textContent=p.title;
-  document.getElementById('prodModalDesc').textContent=p.desc;
-  document.getElementById('prodModalPrice').textContent='€'+parseFloat(p.price).toFixed(0);
-  document.getElementById('prodModalBtn').onclick=()=>{addToCartAjax(p.id,p.title);closeModal('productModal');};
-  openModal('productModal');
+  const p = products[i];
+  if (!p) return;
+  // Open editor directly with this product
+  openPhotoEditor(p.id);
 }
 
 function addToCartAjax(id,name){
@@ -644,223 +623,187 @@ function checkout(){
 }
 
 // ── Photo editor ─────────────────────────
-let loadedImage=null,loadedFile=null,selectedProduct=null,isDragging=false,dragStart={x:0,y:0};
+// ── STATE ────────────────────────────────────────────────
+let editorPhotos = [], currentPhotoIdx = 0, editorProduct = null;
+let isDragging = false, dragStart = {x:0,y:0};
 
-const productAspects={'print_30x40':'3/4','canvas_50x70':'5/7','canvas_80x120':'2/3','panel_60x90':'2/3','book_30x30':'1/1'};
-
-function openPhotoEditor(){openModal('photoEditorModal');}
-
-function switchTab(tab){
-  document.getElementById('tabUpload').style.display=tab==='upload'?'block':'none';
-  const tg=document.getElementById('tabGallery');
-  if(tg)tg.style.display=tab==='gallery'?'block':'none';
-  document.querySelectorAll('.editor-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='upload')||(i===1&&tab==='gallery')));
+function openPhotoEditor(productId) {
+  const p = products.find(x => x.id == productId);
+  if (!p) return;
+  editorProduct = p;
+  document.getElementById('summaryProduct').textContent = p.title + (p.izmers ? ' · ' + p.izmers : '');
+  document.getElementById('summaryPrice').textContent = '€' + parseFloat(p.price).toFixed(0);
+  const badge = document.getElementById('editorCountBadge');
+  if (badge) badge.style.display = 'flex';
+  updateEditorCount();
+  document.getElementById('editorUploadStatus').textContent =
+    p.fotos === 1 ? 'Augšupielādējiet 1 fotogrāfiju' : `Augšupielādējiet ${p.fotos} fotogrāfijas`;
+  const aspects = {portrait:'2/3', landscape:'3/2', square:'1/1'};
+  document.getElementById('frameCanvasArea').style.aspectRatio = aspects[p.orient] || '2/3';
+  openModal('photoEditorModal');
 }
 
-function loadPhoto(file){
-  if(!file)return;
-  loadedFile=file;
-  const dt=new DataTransfer();dt.items.add(file);
-  document.getElementById('formFotoInput').files=dt.files;
-  const r=new FileReader();
-  r.onload=e=>applyPhotoToEditor(e.target.result);
-  r.readAsDataURL(file);
+function switchTab(tab) {
+  document.getElementById('tabUpload').style.display = tab==='upload'?'block':'none';
+  const tg = document.getElementById('tabGallery');
+  if (tg) tg.style.display = tab==='gallery'?'block':'none';
+  document.querySelectorAll('.editor-tab').forEach((t,i) =>
+    t.classList.toggle('active', (i===0&&tab==='upload')||(i===1&&tab==='gallery')));
 }
 
-function loadPhotoFromUrl(url){
-  loadedImage=url;
-  loadedFile=null;
-  document.getElementById('formGalleryUrl').value=url;
-  applyPhotoToEditor(url);
-}
+function handleFileInput(files) { addFiles(Array.from(files)); }
 
-function selectFromGallery(url){
-  closeModal('galleryPickerModal');
-  loadPhotoFromUrl(url);
-  openPhotoEditor();
-}
-
-function applyPhotoToEditor(src){
-  loadedImage=src;
-  const photoBg=document.getElementById('photoBg');
-  const photoWrap=document.getElementById('photoWrap');
-  photoBg.src=src;
-  photoWrap.style.display='block';
-  document.getElementById('photoPlaceholder').style.display='none';
-  document.getElementById('editorDropzone').style.display='none';
-  document.getElementById('photoLoaded').style.display='block';
-  document.getElementById('editorControls').style.display='flex';
-  resetTransform(); checkOrderReady();
-  showToast('Foto ielādēts! Velciet ar peli vai lietojiet slīdņus.','success');
-}
-
-function applyTransform(){
-  const photoWrap=document.getElementById('photoWrap');
-  if(!photoWrap)return;
-  const zoom=parseInt(document.getElementById('zoomSlider').value);
-  const px=parseInt(document.getElementById('posX').value);
-  const py=parseInt(document.getElementById('posY').value);
-  const rot=parseInt(document.getElementById('rotSlider').value);
-  document.getElementById('zoomVal').textContent=zoom+'%';
-  document.getElementById('rotVal').textContent=rot+'°';
-  const pxv=document.getElementById('posXVal');
-  const pyv=document.getElementById('posYVal');
-  if(pxv) pxv.textContent=px;
-  if(pyv) pyv.textContent=py;
-  // Scale relative to 100% baseline, translate within the oversized wrapper
-  // The wrapper is 4x frame size so we have 150% padding on each side - plenty of room
-  photoWrap.style.transform=`translate(${px*0.5}px,${py*0.5}px) scale(${zoom/100}) rotate(${rot}deg)`;
-}
-
-function resetTransform(){
-  ['zoomSlider','posX','posY','rotSlider'].forEach(id=>{
-    document.getElementById(id).value=id==='zoomSlider'?100:0;
+function addFiles(files) {
+  const need = editorProduct ? editorProduct.fotos : 50;
+  const canAdd = Math.max(0, need - editorPhotos.length);
+  if (!canAdd) { showToast('Nepieciešamais foto skaits sasniegts.', 'error'); return; }
+  files.filter(f=>f.type.startsWith('image/')).slice(0, canAdd).forEach(file => {
+    const r = new FileReader();
+    r.onload = ev => {
+      editorPhotos.push({src: ev.target.result, file, galleryUrl: null});
+      renderEditorThumbs(); updateEditorCount();
+      if (editorPhotos.length === 1) showPhotoInPreview(0);
+      checkEditorReady();
+    };
+    r.readAsDataURL(file);
   });
+}
+
+function toggleGalleryPick(el, url) {
+  const idx = editorPhotos.findIndex(p => p.galleryUrl === url);
+  if (idx >= 0) {
+    editorPhotos.splice(idx, 1);
+    el.style.borderColor='transparent';
+    el.querySelector('.gal-pick-check').style.display='none';
+  } else {
+    const need = editorProduct ? editorProduct.fotos : 50;
+    if (editorPhotos.length >= need) { showToast('Nepieciešamais foto skaits sasniegts.','error'); return; }
+    el.style.borderColor='var(--gold)';
+    el.querySelector('.gal-pick-check').style.display='flex';
+    editorPhotos.push({src: url, file: null, galleryUrl: url});
+    if (editorPhotos.length === 1) showPhotoInPreview(0);
+  }
+  renderEditorThumbs(); updateEditorCount(); checkEditorReady();
+}
+
+function renderEditorThumbs() {
+  const c = document.getElementById('uploadedThumbs');
+  c.innerHTML = editorPhotos.map((p,i) => `
+    <div style="position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;border:2px solid ${i===currentPhotoIdx?'var(--gold)':'transparent'};transition:.15s;" onclick="showPhotoInPreview(${i})">
+      <img src="${p.src}" style="width:100%;height:100%;object-fit:cover;">
+      <div style="position:absolute;bottom:2px;left:4px;font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);">${i+1}</div>
+      <button onclick="event.stopPropagation();removeEditorPhoto(${i})" style="position:absolute;top:2px;right:2px;width:17px;height:17px;background:rgba(0,0,0,.7);border:none;color:#fff;cursor:pointer;font-size:11px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;">×</button>
+    </div>`).join('');
+}
+
+function removeEditorPhoto(i) {
+  const p = editorPhotos[i];
+  if (p.galleryUrl) {
+    document.querySelectorAll('.gal-pick').forEach(el => {
+      if (el.dataset.url === p.galleryUrl) { el.style.borderColor='transparent'; el.querySelector('.gal-pick-check').style.display='none'; }
+    });
+  }
+  editorPhotos.splice(i, 1);
+  if (currentPhotoIdx >= editorPhotos.length) currentPhotoIdx = Math.max(0, editorPhotos.length-1);
+  renderEditorThumbs(); updateEditorCount();
+  editorPhotos.length ? showPhotoInPreview(currentPhotoIdx) : clearPreview();
+  checkEditorReady();
+}
+
+function updateEditorCount() {
+  const have = editorPhotos.length, need = editorProduct ? editorProduct.fotos : 1;
+  const nb = document.getElementById('editorCountNow'); if (nb) nb.textContent = have;
+  const st = document.getElementById('editorUploadStatus');
+  if (st) { st.textContent = have>=need ? `✓ ${have} foto pievienoti — var pasūtīt!` : `${have} / ${need} foto pievienoti`; st.style.color=have>=need?'var(--gold)':'var(--grey)'; }
+}
+
+function showPhotoInPreview(i) {
+  currentPhotoIdx = i;
+  const src = editorPhotos[i]?.src; if (!src) return;
+  document.getElementById('photoBg').src = src;
+  document.getElementById('photoWrap').style.display = 'block';
+  document.getElementById('photoPlaceholder').style.display = 'none';
+  document.getElementById('editorControls').style.display = 'flex';
+  const es = document.getElementById('editStep'); if (es) es.style.display = 'block';
+  resetTransform(); renderEditorThumbs();
+}
+
+function clearPreview() {
+  document.getElementById('photoWrap').style.display = 'none';
+  document.getElementById('photoBg').src = '';
+  document.getElementById('photoPlaceholder').style.display = 'flex';
+  document.getElementById('editorControls').style.display = 'none';
+  const es = document.getElementById('editStep'); if (es) es.style.display = 'none';
+}
+
+function checkEditorReady() {
+  const have = editorPhotos.length, need = editorProduct ? editorProduct.fotos : 1;
+  const btn = document.getElementById('orderBtn');
+  btn.disabled = have < need; btn.style.opacity = have>=need?'1':'0.4';
+}
+
+function applyTransform() {
+  const pw = document.getElementById('photoWrap'); if (!pw) return;
+  const zoom = parseInt(document.getElementById('zoomSlider').value);
+  const px   = parseInt(document.getElementById('posX').value);
+  const py   = parseInt(document.getElementById('posY').value);
+  const rot  = parseInt(document.getElementById('rotSlider').value);
+  const zv = document.getElementById('zoomVal'); if (zv) zv.textContent = zoom+'%';
+  const rv = document.getElementById('rotVal');  if (rv) rv.textContent  = rot+'°';
+  pw.style.transform = `translate(${px*0.5}px,${py*0.5}px) scale(${zoom/100}) rotate(${rot}deg)`;
+}
+
+function resetTransform() {
+  ['zoomSlider','posX','posY','rotSlider'].forEach(id => { const el=document.getElementById(id); if(el) el.value=id==='zoomSlider'?100:0; });
   applyTransform();
 }
-
 function fitPhoto(){resetTransform();}
 
-function selectProduct(label,name,price,type){
-  document.querySelectorAll('.product-option').forEach(l=>l.classList.remove('selected'));
-  label.classList.add('selected');
-  selectedProduct={name,price,type};
-  const aspect=productAspects[type]||'3/4';
-  document.getElementById('frameCanvasArea').style.aspectRatio=aspect;
-  document.getElementById('summaryProduct').textContent=name;
-  document.getElementById('summaryPrice').textContent='€'+price;
-  checkOrderReady();
-}
-
-function checkOrderReady(){
-  const ready=loadedImage&&selectedProduct;
-  const btn=document.getElementById('orderBtn');
-  btn.disabled=!ready;btn.style.opacity=ready?'1':'0.4';
-}
-
-function addPhotoToCart(){
-  if(!loadedImage||!selectedProduct)return;
-
-  const btn=document.getElementById('orderBtn');
-  btn.textContent='Pievieno...';btn.disabled=true;
-
-  const cropData=JSON.stringify({
-    zoom:document.getElementById('zoomSlider').value,
-    posX:document.getElementById('posX').value,
-    posY:document.getElementById('posY').value,
-    rot:document.getElementById('rotSlider').value,
-    type:selectedProduct.type
-  });
-  const notes=document.getElementById('orderNotes').value;
-
-  const formData=new FormData();
-  formData.append('add_photo_to_cart','1');
-  formData.append('produkts', selectedProduct.name+' — €'+selectedProduct.price);
-  formData.append('cena', selectedProduct.price);
-  formData.append('notes', notes);
-  formData.append('crop_data', cropData);
-  // Attach file if uploaded from device
-  const fileInput=document.getElementById('formFotoInput');
-  if(fileInput && fileInput.files[0]) {
-    formData.append('foto', fileInput.files[0]);
-  } else if(loadedImage && loadedImage.startsWith('data:')) {
-    // base64 image - convert to blob
-    const blob=dataURLtoBlob(loadedImage);
-    formData.append('foto', blob, 'foto.jpg');
-  } else if(loadedImage) {
-    formData.append('gallery_url', loadedImage);
-  }
-
-  fetch('/4pt/blazkova/lumina/Lumina/veikals.php', {method:'POST', body:formData})
-    .then(r=>r.json())
-    .then(data=>{
+function addPhotoToCart() {
+  if (!editorProduct || editorPhotos.length < editorProduct.fotos) return;
+  const gEl = document.getElementById('guestEmail');
+  if (gEl) { const em=gEl.value.trim(); if (!em||!em.includes('@')) { showToast('Lūdzu ievadiet e-pasta adresi!','error'); gEl.focus(); gEl.style.borderColor='#C0392B'; return; } }
+  const btn = document.getElementById('orderBtn');
+  btn.textContent = 'Pievieno...'; btn.disabled = true;
+  const fd = new FormData();
+  fd.append('add_photo_to_cart','1');
+  fd.append('produkts', editorProduct.title + (editorProduct.izmers?' '+editorProduct.izmers:'') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
+  fd.append('cena', editorProduct.price);
+  fd.append('notes', document.getElementById('orderNotes').value);
+  if (gEl) fd.append('guest_email', gEl.value.trim());
+  const galUrls = editorPhotos.filter(p=>p.galleryUrl).map(p=>p.galleryUrl);
+  if (galUrls.length) fd.append('gallery_urls', JSON.stringify(galUrls));
+  let fc=0;
+  editorPhotos.filter(p=>!p.galleryUrl&&p.src.startsWith('data:')).forEach(p => fd.append('fotos[]', dataURLtoBlob(p.src), 'f'+(++fc)+'.jpg'));
+  fetch('/4pt/blazkova/lumina/Lumina/veikals.php',{method:'POST',body:fd})
+    .then(r=>r.json()).then(data=>{
       if(data.ok){
         document.getElementById('cartCount').textContent=data.count;
         closeModal('photoEditorModal');
-        showToast(selectedProduct.name+' pievienots grozam ✓','success');
-        // Reset editor state
-        loadedImage=null;loadedFile=null;selectedProduct=null;
-        document.getElementById('photoWrap').style.display='none';
-        document.getElementById('photoBg').src='';
-        document.getElementById('photoPlaceholder').style.display='flex';
-        document.getElementById('editorControls').style.display='none';
-        document.querySelectorAll('.product-option').forEach(l=>l.classList.remove('selected'));
-        resetTransform();
-      } else {
-        showToast(data.error||'Kļūda pievienojot grozam','error');
-      }
-      btn.textContent='Pievienot grozam →';btn.disabled=false;
-    }).catch(()=>{
-      showToast('Savienojuma kļūda','error');
-      btn.textContent='Pievienot grozam →';btn.disabled=false;
-    });
+        showToast(editorProduct.title+' pievienots grozam ✓','success');
+        editorPhotos=[]; currentPhotoIdx=0;
+        document.querySelectorAll('.gal-pick').forEach(el=>{el.style.borderColor='transparent';el.querySelector('.gal-pick-check').style.display='none';});
+        clearPreview();
+        document.getElementById('uploadedThumbs').innerHTML='';
+        document.getElementById('orderNotes').value='';
+        if(gEl) gEl.value='';
+        checkEditorReady(); updateEditorCount();
+      } else { showToast(data.error||'Kļūda','error'); }
+      btn.textContent='Pievienot grozam →'; btn.disabled=false;
+    }).catch(()=>{ showToast('Savienojuma kļūda','error'); btn.textContent='Pievienot grozam →'; btn.disabled=false; });
 }
 
-function dataURLtoBlob(dataURL){
-  const arr=dataURL.split(',');
-  const mime=arr[0].match(/:(.*?);/)[1];
-  const bstr=atob(arr[1]);
-  let n=bstr.length;
-  const u8arr=new Uint8Array(n);
-  while(n--) u8arr[n]=bstr.charCodeAt(n);
-  return new Blob([u8arr],{type:mime});
-}
+function dataURLtoBlob(d){const a=d.split(','),m=a[0].match(/:(.*?);/)[1],b=atob(a[1]);let n=b.length;const u=new Uint8Array(n);while(n--)u[n]=b.charCodeAt(n);return new Blob([u],{type:m});}
 
-// ── Drag to move photo ───────────────────
 const pc=document.getElementById('photoContainer');
-pc.addEventListener('mousedown',e=>{
-  if(!loadedImage)return;
-  isDragging=true;
-  dragStart.x=e.clientX-parseInt(document.getElementById('posX').value||0);
-  dragStart.y=e.clientY-parseInt(document.getElementById('posY').value||0);
-  pc.style.cursor='grabbing';e.preventDefault();
-});
-document.addEventListener('mousemove',e=>{
-  if(!isDragging)return;
-  document.getElementById('posX').value=Math.max(-200,Math.min(200,e.clientX-dragStart.x));
-  document.getElementById('posY').value=Math.max(-200,Math.min(200,e.clientY-dragStart.y));
-  applyTransform();
-});
+pc.addEventListener('mousedown',e=>{if(!editorPhotos.length)return;isDragging=true;dragStart.x=e.clientX-parseInt(document.getElementById('posX').value||0);dragStart.y=e.clientY-parseInt(document.getElementById('posY').value||0);pc.style.cursor='grabbing';e.preventDefault();});
+document.addEventListener('mousemove',e=>{if(!isDragging)return;document.getElementById('posX').value=Math.max(-200,Math.min(200,e.clientX-dragStart.x));document.getElementById('posY').value=Math.max(-200,Math.min(200,e.clientY-dragStart.y));applyTransform();});
 document.addEventListener('mouseup',()=>{isDragging=false;pc.style.cursor='grab';});
-
-// Touch
-pc.addEventListener('touchstart',e=>{
-  if(!loadedImage)return;isDragging=true;
-  const t=e.touches[0];
-  dragStart.x=t.clientX-parseInt(document.getElementById('posX').value||0);
-  dragStart.y=t.clientY-parseInt(document.getElementById('posY').value||0);
-},{passive:true});
-document.addEventListener('touchmove',e=>{
-  if(!isDragging)return;
-  const t=e.touches[0];
-  document.getElementById('posX').value=Math.max(-200,Math.min(200,t.clientX-dragStart.x));
-  document.getElementById('posY').value=Math.max(-200,Math.min(200,t.clientY-dragStart.y));
-  applyTransform();
-},{passive:true});
+pc.addEventListener('touchstart',e=>{if(!editorPhotos.length)return;isDragging=true;const t=e.touches[0];dragStart.x=t.clientX-parseInt(document.getElementById('posX').value||0);dragStart.y=t.clientY-parseInt(document.getElementById('posY').value||0);},{passive:true});
+document.addEventListener('touchmove',e=>{if(!isDragging)return;const t=e.touches[0];document.getElementById('posX').value=Math.max(-200,Math.min(200,t.clientX-dragStart.x));document.getElementById('posY').value=Math.max(-200,Math.min(200,t.clientY-dragStart.y));applyTransform();},{passive:true});
 document.addEventListener('touchend',()=>isDragging=false);
-
-// Scroll to zoom
-pc.addEventListener('wheel',e=>{
-  if(!loadedImage)return;e.preventDefault();
-  const s=document.getElementById('zoomSlider');
-  s.value=Math.max(50,Math.min(300,parseInt(s.value)-e.deltaY*0.3));
-  applyTransform();
-},{passive:false});
-
-// Drag & drop file
+pc.addEventListener('wheel',e=>{if(!editorPhotos.length)return;e.preventDefault();const s=document.getElementById('zoomSlider');s.value=Math.max(10,Math.min(300,parseInt(s.value)-e.deltaY*0.3));applyTransform();},{passive:false});
 const dz=document.getElementById('editorDropzone');
-if(dz){
-  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
-  dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-  dz.addEventListener('drop',e=>{
-    e.preventDefault();dz.classList.remove('drag-over');
-    const f=e.dataTransfer.files[0];
-    if(f&&f.type.startsWith('image/'))loadPhoto(f);
-  });
-}
+if(dz){dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');addFiles(Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')));});}
 
-<?php if($uploadSuccess): ?>window.addEventListener('DOMContentLoaded',()=>openModal('successModal'));<?php endif; ?>
-<?php if($uploadError): ?>window.addEventListener('DOMContentLoaded',()=>showToast('<?= addslashes($uploadError) ?>','error'));<?php endif; ?>
-<?php if(isset($_GET['paid'])): ?>window.addEventListener('DOMContentLoaded',()=>{document.getElementById('cartCount').textContent='0';openModal('successModal');});<?php endif; ?>
-<?php if(isset($_GET['cancelled'])): ?>window.addEventListener('DOMContentLoaded',()=>showToast('Maksājums atcelts. Grozs saglabāts.','error'));<?php endif; ?>
 </script>
