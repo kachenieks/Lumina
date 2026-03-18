@@ -57,7 +57,7 @@ $categories = array_unique(array_column($items, 'kategorija'));
 <div class="portfolio-cta reveal">
   <div class="section-label" style="display:flex;justify-content:center;">Jūsu stāsts</div>
   <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(32px,5vw,56px);font-weight:300;color:var(--ink);margin:14px 0;">Gatavs savai <em style="font-style:italic;color:var(--gold)">fotosesijai?</em></h2>
-  <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt Sesiju →</a>
+  <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt sesiju →</a>
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

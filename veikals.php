@@ -1,4 +1,5 @@
 <?php
+ob_start(); // Buffer output — prevents PHP errors/warnings from breaking HTML
 session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
@@ -45,6 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
   $cropData = escape($savienojums, $_POST['crop_data'] ?? '');
   $klienta_id = isset($_SESSION['klients_id']) ? (int)$_SESSION['klients_id'] : 0;
   $galUrl   = escape($savienojums, $_POST['gallery_url'] ?? '');
+  // Guest email — use session or submitted
+  $guestEmail = '';
+  if (!isset($_SESSION['klients_id'])) {
+    $guestEmail = filter_var($_POST['guest_email'] ?? '', FILTER_VALIDATE_EMAIL) ?: '';
+  }
 
   $fotoInfo = '';
 
@@ -71,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
   // E-pasta paziņojumi — tikai ja PHPMailer ir augšupielādēts
   if ($uploadSuccess) {
     $klientaVards = $_SESSION['klients_vards'] ?? 'Viesis';
-    $klientaEmail = $_SESSION['klients_epasts'] ?? '';
+    $klientaEmail = $_SESSION['klients_epasts'] ?? $guestEmail;
     $mailerPath = __DIR__ . '/includes/mailer.php';
     $phpmailerOk = file_exists(__DIR__ . '/PHPMailer/src/PHPMailer.php');
     if ($phpmailerOk && file_exists($mailerPath)) {
@@ -103,70 +109,102 @@ if (isset($_SESSION['klients_id'])) {
 
 <style>
 /* ─── EDITOR STYLES ─── */
-.editor-topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--white);position:sticky;top:0;z-index:10;}
+:root{--border:#e8e3da;}
+.editor-topbar{display:flex;justify-content:space-between;align-items:center;padding:14px clamp(16px,3vw,28px);border-bottom:1px solid var(--border);background:var(--white);position:sticky;top:0;z-index:10;gap:12px;flex-wrap:wrap;}
 .editor-layout{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 60px);}
-.editor-sidebar{padding:28px 24px;border-right:1px solid var(--border);overflow-y:auto;background:#faf9f7;}
-.editor-step{margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--border);}
+.editor-sidebar{padding:24px 20px;border-right:1px solid var(--border);overflow-y:auto;background:#faf9f7;max-height:calc(100vh - 60px);position:sticky;top:60px;}
+.editor-step{margin-bottom:26px;padding-bottom:26px;border-bottom:1px solid var(--border);}
 .editor-step:last-child{border-bottom:none;}
-.editor-step-num{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;}
+.editor-step-num{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:5px;}
 .editor-step-title{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--ink);margin-bottom:14px;}
-.editor-dropzone{border:2px dashed var(--border);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--white);}
+.editor-dropzone{border:2px dashed var(--border);padding:24px 14px;text-align:center;cursor:pointer;transition:.2s;background:var(--white);}
 .editor-dropzone:hover,.editor-dropzone.drag-over{border-color:var(--gold);background:rgba(184,151,90,.04);}
-.dropzone-icon{font-size:32px;margin-bottom:8px;}
-.dropzone-text{font-size:14px;color:var(--ink);margin-bottom:4px;}
+.dropzone-icon{font-size:30px;margin-bottom:8px;}
+.dropzone-text{font-size:13px;color:var(--ink);margin-bottom:4px;}
 .dropzone-sub{font-size:11px;color:var(--grey);}
-.editor-tabs{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
-.editor-tab{flex:1;padding:8px;font-size:12px;border:none;background:transparent;cursor:pointer;color:var(--grey);transition:.2s;}
+.editor-tabs{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);overflow:hidden;}
+.editor-tab{flex:1;padding:9px;font-size:11px;letter-spacing:.5px;border:none;background:transparent;cursor:pointer;color:var(--grey);transition:.2s;}
 .editor-tab.active{background:var(--gold);color:var(--white);}
-.product-options{display:flex;flex-direction:column;gap:8px;}
-.product-option{display:flex;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer;transition:.2s;}
+.product-options{display:flex;flex-direction:column;gap:6px;}
+.product-option{display:flex;border:1.5px solid var(--border);padding:11px 13px;cursor:pointer;transition:.2s;position:relative;}
 .product-option:hover{border-color:var(--gold);}
 .product-option.selected{border-color:var(--gold);background:rgba(184,151,90,.06);}
+.product-option.selected::before{content:'✓';position:absolute;top:10px;right:12px;font-size:11px;color:var(--gold);font-weight:700;}
 .product-option input{display:none;}
 .product-option-name{font-size:13px;font-weight:500;color:var(--ink);}
-.product-option-price{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--gold);line-height:1;}
+.product-option-price{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--gold);line-height:1;}
 .product-option-desc{font-size:11px;color:var(--grey);margin-top:2px;}
-.editor-controls{display:flex;flex-direction:column;gap:10px;padding:18px 22px;background:#faf9f7;border-top:1px solid var(--border);}
-.control-group{display:flex;align-items:center;gap:10px;}
-.control-label{font-size:11px;color:var(--grey);width:100px;flex-shrink:0;}
-.control-val{font-size:11px;color:var(--gold);width:36px;text-align:right;flex-shrink:0;}
-.editor-slider{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--border);outline:none;}
-.editor-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--gold);cursor:pointer;}
-.editor-btn{padding:7px 14px;font-size:11px;border:1px solid var(--border);background:var(--white);border-radius:5px;cursor:pointer;color:var(--grey);transition:.2s;}
-.editor-btn:hover{border-color:var(--gold);color:var(--gold);}
-/* Dark sliders for editor panel */
-.dark-slider{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.12);outline:none;cursor:pointer;transition:background .2s;}
-.dark-slider:hover{background:rgba(255,255,255,.2);}
-.dark-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--gold,#B8975A);cursor:pointer;border:2px solid #1a1a1a;box-shadow:0 0 0 1px rgba(184,151,90,.4);}
-.dark-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--gold,#B8975A);cursor:pointer;border:2px solid #1a1a1a;}
 /* Wall preview */
 .editor-preview-area{display:flex;flex-direction:column;background:#ece9e4;}
 .editor-preview-label{text-align:center;font-size:10px;letter-spacing:3px;color:rgba(0,0,0,.3);text-transform:uppercase;padding:14px;flex-shrink:0;}
 .wall-scene{flex:1;display:flex;align-items:center;justify-content:center;min-height:420px;padding:40px;position:relative;}
 .wall-bg{position:absolute;inset:0;background:linear-gradient(160deg,#e8e3dc 0%,#d5cfc7 100%);}
 .wall-frame-wrapper{position:relative;z-index:2;}
-.wall-frame{background:var(--white);box-shadow:0 20px 60px rgba(0,0,0,.22),0 4px 12px rgba(0,0,0,.12);border:14px solid #f5f3ef;position:relative;width:280px;}
+.wall-frame{background:var(--white);box-shadow:0 24px 64px rgba(0,0,0,.25),0 4px 12px rgba(0,0,0,.12);border:14px solid #f5f3ef;position:relative;width:280px;}
 .frame-canvas-area{width:100%;aspect-ratio:3/4;overflow:hidden;position:relative;background:#111;cursor:grab;}
 .frame-canvas-area:active{cursor:grabbing;}
 .photo-container{position:absolute;inset:0;overflow:hidden;}
 #photoCanvas{position:absolute;width:100%;height:100%;object-fit:cover;top:0;left:0;transform-origin:center center;}
 .photo-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#222;}
 .frame-shadow{position:absolute;bottom:-18px;left:10%;right:10%;height:16px;background:rgba(0,0,0,.15);filter:blur(10px);border-radius:50%;}
+/* Dark control panel */
+.editor-controls{display:flex;flex-direction:column;gap:0;border-top:2px solid var(--gold,#B8975A);}
+.ctrl-header{padding:10px 20px 8px;background:#1a1a1a;}
+.ctrl-header span{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.35);}
+.ctrl-body{background:#161616;padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
+.ctrl-row{display:grid;grid-template-columns:30px 1fr 48px;gap:10px;align-items:center;}
+.ctrl-icon{color:rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center;}
+.ctrl-val{font-size:11px;font-family:monospace;text-align:right;white-space:nowrap;color:var(--gold,#B8975A);}
+.ctrl-val.muted{color:rgba(255,255,255,.3);}
+/* Improved dark slider */
+.dark-slider{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:5px;border-radius:3px;
+  background:rgba(255,255,255,.1);
+  outline:none;cursor:pointer;
+}
+.dark-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--gold,#B8975A);
+  cursor:pointer;
+  border:3px solid #161616;
+  box-shadow:0 0 0 1.5px var(--gold,#B8975A),0 2px 8px rgba(0,0,0,.4);
+  transition:transform .15s;
+}
+.dark-slider::-webkit-slider-thumb:active{transform:scale(1.2);}
+.dark-slider::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;
+  background:var(--gold,#B8975A);
+  cursor:pointer;border:3px solid #161616;
+}
+.dark-slider::-webkit-slider-runnable-track{border-radius:3px;}
+.ctrl-actions{display:flex;gap:1px;background:#111;}
+.ctrl-btn{flex:1;padding:11px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:none;cursor:pointer;transition:.2s;font-family:'Montserrat',sans-serif;}
+.ctrl-btn-reset{background:#222;color:rgba(255,255,255,.4);}
+.ctrl-btn-reset:hover{background:#333;color:#fff;}
+.ctrl-btn-fit{background:rgba(184,151,90,.12);color:var(--gold,#B8975A);}
+.ctrl-btn-fit:hover{background:var(--gold,#B8975A);color:#fff;}
 /* Gallery thumbs */
-.gallery-thumb{position:relative;aspect-ratio:1;overflow:hidden;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:.2s;}
+.gallery-thumb{position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.2s;}
 .gallery-thumb:hover{border-color:var(--gold);}
 .gallery-thumb img{width:100%;height:100%;object-fit:cover;}
 .gallery-thumb-overlay{position:absolute;inset:0;background:rgba(184,151,90,.7);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s;}
 .gallery-thumb:hover .gallery-thumb-overlay{opacity:1;}
-.gallery-picker-thumb{position:relative;aspect-ratio:1;overflow:hidden;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:.2s;}
+.gallery-picker-thumb{position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.2s;}
 .gallery-picker-thumb:hover{border-color:var(--gold);}
 .gallery-picker-thumb img{width:100%;height:100%;object-fit:cover;}
 .gallery-picker-overlay{position:absolute;inset:0;background:rgba(184,151,90,.75);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s;}
 .gallery-picker-thumb:hover .gallery-picker-overlay{opacity:1;}
-@media(max-width:800px){
-  .editor-layout{grid-template-columns:1fr;}
-  .wall-frame{width:200px;}
-  .editor-sidebar{border-right:none;border-bottom:1px solid var(--border);}
+@media(max-width:900px){
+  .editor-layout{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+  .editor-sidebar{max-height:none;position:static;border-right:none;border-bottom:1px solid var(--border);}
+  .wall-scene{min-height:300px;padding:24px;}
+  .wall-frame{width:180px;}
+}
+@media(max-width:480px){
+  .editor-topbar{flex-direction:column;align-items:flex-start;gap:10px;}
+  .wall-frame{width:150px;}
 }
 </style>
 
@@ -365,6 +403,16 @@ if (isset($_SESSION['klients_id'])) {
           <div class="editor-step-num">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
           <textarea id="orderNotes" class="form-textarea" style="height:80px;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
+
+          <?php if (!isset($_SESSION['klients_id'])): ?>
+          <!-- Guest email field -->
+          <div style="margin-top:12px;">
+            <label style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:7px;">E-pasts *</label>
+            <input type="email" id="guestEmail" class="form-input" style="width:100%;font-size:13px;" placeholder="tavs@epasts.lv" required>
+            <div style="font-size:10px;color:var(--grey);margin-top:5px;">Apstiprinājumu nosūtīsim uz šo adresi</div>
+          </div>
+          <?php endif; ?>
+
           <div style="margin-top:12px;padding:14px;background:var(--cream2,#f5f3ef);border-radius:6px;">
             <div style="font-size:10px;color:var(--grey);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Kopsavilkums</div>
             <div id="summaryProduct" style="font-size:13px;color:var(--ink);margin-bottom:4px;">— izvēlieties produktu —</div>
@@ -383,8 +431,22 @@ if (isset($_SESSION['klients_id'])) {
           <div class="wall-frame-wrapper" id="wallFrameWrapper">
             <div class="wall-frame" id="wallFrame">
               <div class="frame-canvas-area" id="frameCanvasArea">
-                <div class="photo-container" id="photoContainer" style="cursor:grab;">
-                  <canvas id="photoCanvas" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transform-origin:center center;"></canvas>
+                <div class="photo-container" id="photoContainer" style="cursor:grab;position:absolute;inset:0;overflow:hidden;background:#111;">
+                  <!-- Oversized wrapper: 4x frame size, centered. Pan never reveals black edges. -->
+                  <div id="photoWrap" style="
+                    display:none;
+                    position:absolute;
+                    width:400%; height:400%;
+                    top:-150%; left:-150%;
+                    transform-origin:center center;
+                  ">
+                    <img id="photoBg" src="" alt="" style="
+                      width:100%; height:100%;
+                      object-fit:cover;
+                      display:block;
+                    ">
+                  </div>
+                  <canvas id="photoCanvas" style="display:none;position:absolute;"></canvas>
                   <div class="photo-placeholder" id="photoPlaceholder">
                     <div style="text-align:center;color:rgba(255,255,255,.35);font-size:13px;">
                       <div style="font-size:38px;margin-bottom:10px;">🖼️</div>
@@ -398,52 +460,48 @@ if (isset($_SESSION['klients_id'])) {
           </div>
         </div>
 
-        <!-- Sliders -->
-        <div class="editor-controls" id="editorControls" style="display:none;flex-direction:column;gap:0;border-top:2px solid var(--gold,#B8975A);">
-          <div style="padding:10px 20px 6px;background:#1C1C1C;">
-            <span style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.4);">Pielāgot fotogrāfiju</span>
+        <!-- Controls panel -->
+        <div class="editor-controls" id="editorControls" style="display:none;">
+          <div class="ctrl-header">
+            <span>Pielāgot fotogrāfiju</span>
           </div>
-          <div style="background:#1a1a1a;padding:14px 20px;display:flex;flex-direction:column;gap:12px;">
+          <div class="ctrl-body">
             <!-- Zoom -->
-            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
-              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Tālummaiņa">
+            <div class="ctrl-row">
+              <div class="ctrl-icon" title="Tālummaiņa">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
               </div>
-              <input type="range" id="zoomSlider" min="50" max="300" value="100" class="editor-slider dark-slider" oninput="applyTransform()">
-              <span id="zoomVal" style="font-size:11px;color:var(--gold,#B8975A);font-family:monospace;text-align:right;white-space:nowrap;">100%</span>
+              <input type="range" id="zoomSlider" min="50" max="300" value="100" class="dark-slider" oninput="applyTransform()">
+              <span id="zoomVal" class="ctrl-val">100%</span>
             </div>
             <!-- Horizontal -->
-            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
-              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Horizontāli">
+            <div class="ctrl-row">
+              <div class="ctrl-icon" title="Horizontāli">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M15 8l4 4-4 4M9 8l-4 4 4 4"/></svg>
               </div>
-              <input type="range" id="posX" min="-200" max="200" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
-              <span id="posXVal" style="font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;text-align:right;white-space:nowrap;">0</span>
+              <input type="range" id="posX" min="-200" max="200" value="0" class="dark-slider" oninput="applyTransform()">
+              <span id="posXVal" class="ctrl-val muted">0</span>
             </div>
             <!-- Vertical -->
-            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
-              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Vertikāli">
+            <div class="ctrl-row">
+              <div class="ctrl-icon" title="Vertikāli">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4"/></svg>
               </div>
-              <input type="range" id="posY" min="-200" max="200" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
-              <span id="posYVal" style="font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;text-align:right;white-space:nowrap;">0</span>
+              <input type="range" id="posY" min="-200" max="200" value="0" class="dark-slider" oninput="applyTransform()">
+              <span id="posYVal" class="ctrl-val muted">0</span>
             </div>
             <!-- Rotation -->
-            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
-              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Rotācija">
+            <div class="ctrl-row">
+              <div class="ctrl-icon" title="Rotācija">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
               </div>
-              <input type="range" id="rotSlider" min="-180" max="180" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
-              <span id="rotVal" style="font-size:11px;color:var(--gold,#B8975A);font-family:monospace;text-align:right;white-space:nowrap;">0°</span>
+              <input type="range" id="rotSlider" min="-180" max="180" value="0" class="dark-slider" oninput="applyTransform()">
+              <span id="rotVal" class="ctrl-val">0°</span>
             </div>
           </div>
-          <div style="display:flex;gap:1px;background:#111;">
-            <button class="editor-btn dark-btn" onclick="resetTransform()" style="flex:1;padding:10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:none;background:#252525;color:rgba(255,255,255,.45);cursor:pointer;transition:.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
-              Atiestatīt
-            </button>
-            <button class="editor-btn dark-btn" onclick="fitPhoto()" style="flex:1;padding:10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:none;background:#2a2520;color:var(--gold,#B8975A);cursor:pointer;transition:.2s;" onmouseover="this.style.background='#B8975A';this.style.color='#fff'" onmouseout="this.style.background='#2a2520';this.style.color='var(--gold,#B8975A)'">
-              Pielāgot rāmim
-            </button>
+          <div class="ctrl-actions">
+            <button class="ctrl-btn ctrl-btn-reset" onclick="resetTransform()">↺ Atiestatīt</button>
+            <button class="ctrl-btn ctrl-btn-fit" onclick="fitPhoto()">⊡ Pielāgot rāmim</button>
           </div>
         </div>
 
@@ -457,6 +515,7 @@ if (isset($_SESSION['klients_id'])) {
       <input type="hidden" name="notes" id="formNotes">
       <input type="hidden" name="crop_data" id="formCropData">
       <input type="hidden" name="gallery_url" id="formGalleryUrl">
+      <input type="hidden" name="guest_email" id="formGuestEmail">
       <input type="file" name="foto" id="formFotoInput" accept="image/*">
     </form>
 
@@ -577,55 +636,34 @@ function selectFromGallery(url){
 
 function applyPhotoToEditor(src){
   loadedImage=src;
-  const img=new Image();
-  img.crossOrigin='anonymous';
-  img.onload=()=>{
-    const canvas=document.getElementById('photoCanvas');
-    canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-    canvas.getContext('2d').drawImage(img,0,0);
-    canvas.style.display='block';
-    document.getElementById('photoPlaceholder').style.display='none';
-    document.getElementById('editorDropzone').style.display='none';
-    document.getElementById('photoLoaded').style.display='block';
-    document.getElementById('editorControls').style.display='flex';
-    resetTransform();checkOrderReady();
-    showToast('Foto ielādēts! Velciet ar peli vai lietojiet slīdņus.','success');
-  };
-  img.onerror=()=>{
-    // If CORS fails, still show as background
-    const container=document.getElementById('photoContainer');
-    container.style.backgroundImage=`url('${src}')`;
-    container.style.backgroundSize='cover';
-    container.style.backgroundPosition='center';
-    document.getElementById('photoPlaceholder').style.display='none';
-    document.getElementById('editorDropzone').style.display='none';
-    document.getElementById('photoLoaded').style.display='block';
-    document.getElementById('editorControls').style.display='flex';
-    checkOrderReady();
-    showToast('Foto ielādēts!','success');
-  };
-  img.src=src;
+  const photoBg=document.getElementById('photoBg');
+  const photoWrap=document.getElementById('photoWrap');
+  photoBg.src=src;
+  photoWrap.style.display='block';
+  document.getElementById('photoPlaceholder').style.display='none';
+  document.getElementById('editorDropzone').style.display='none';
+  document.getElementById('photoLoaded').style.display='block';
+  document.getElementById('editorControls').style.display='flex';
+  resetTransform(); checkOrderReady();
+  showToast('Foto ielādēts! Velciet ar peli vai lietojiet slīdņus.','success');
 }
 
 function applyTransform(){
-  const canvas=document.getElementById('photoCanvas');
-  if(!canvas)return;
-  const zoom=document.getElementById('zoomSlider').value;
-  const px=document.getElementById('posX').value;
-  const py=document.getElementById('posY').value;
-  const rot=document.getElementById('rotSlider').value;
+  const photoWrap=document.getElementById('photoWrap');
+  if(!photoWrap)return;
+  const zoom=parseInt(document.getElementById('zoomSlider').value);
+  const px=parseInt(document.getElementById('posX').value);
+  const py=parseInt(document.getElementById('posY').value);
+  const rot=parseInt(document.getElementById('rotSlider').value);
   document.getElementById('zoomVal').textContent=zoom+'%';
   document.getElementById('rotVal').textContent=rot+'°';
   const pxv=document.getElementById('posXVal');
   const pyv=document.getElementById('posYVal');
   if(pxv) pxv.textContent=px;
   if(pyv) pyv.textContent=py;
-  canvas.style.transform=`translate(${px}px,${py}px) scale(${zoom/100}) rotate(${rot}deg)`;
-  const container=document.getElementById('photoContainer');
-  if(container && container.style.backgroundImage){
-    container.style.backgroundPosition=`calc(50% + ${px}px) calc(50% + ${py}px)`;
-    container.style.backgroundSize=`${zoom}%`;
-  }
+  // Scale relative to 100% baseline, translate within the oversized wrapper
+  // The wrapper is 4x frame size so we have 150% padding on each side - plenty of room
+  photoWrap.style.transform=`translate(${px*0.5}px,${py*0.5}px) scale(${zoom/100}) rotate(${rot}deg)`;
 }
 
 function resetTransform(){
@@ -656,6 +694,20 @@ function checkOrderReady(){
 
 function submitOrder(){
   if(!loadedImage||!selectedProduct)return;
+
+  // Validate guest email if not logged in
+  const guestEmailEl=document.getElementById('guestEmail');
+  if(guestEmailEl){
+    const em=guestEmailEl.value.trim();
+    if(!em||!em.includes('@')){
+      showToast('Lūdzu ievadiet e-pasta adresi!','error');
+      guestEmailEl.focus();
+      guestEmailEl.style.borderColor='#C0392B';
+      return;
+    }
+    document.getElementById('formGuestEmail').value=em;
+  }
+
   const cropData=JSON.stringify({
     zoom:document.getElementById('zoomSlider').value,
     posX:document.getElementById('posX').value,

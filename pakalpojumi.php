@@ -114,7 +114,7 @@ $extraCss = 'pakalpojumi.css';
 <div class="pakalpojumi-cta reveal">
   <div class="section-label" style="display:flex;justify-content:center;margin-bottom:20px;">Sāksim kopā</div>
   <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(36px,5vw,64px);font-weight:300;color:var(--ink);margin-bottom:20px;">Jūsu stāsts gaida, kad<br><em style="font-style:italic;color:var(--gold)">to iemūžināsim</em></h2>
-  <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary" style="margin-right:14px;">Rezervēt Sesiju →</a>
+  <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary" style="margin-right:14px;">Rezervēt sesiju →</a>
   <a href="/4pt/blazkova/lumina/Lumina/index.php#contact" class="btn-outline">Sazināties</a>
 </div>
 

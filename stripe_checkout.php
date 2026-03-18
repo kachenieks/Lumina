@@ -133,12 +133,17 @@ if ($action === 'success') {
       @mysqli_query($savienojums, "UPDATE klienti SET kopeja_summa = kopeja_summa + $total WHERE id=$klientsId");
     }
 
-    // Send emails — only if mailer is available
-    $mailerPath = __DIR__ . '/includes/mailer.php';
-    if (file_exists($mailerPath)) {
-      require_once $mailerPath;
-      if ($klientaEmail) @mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
-      @mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+    // Send emails — only if PHPMailer library is uploaded
+    $mailerPath   = __DIR__ . '/includes/mailer.php';
+    $phpmailerOk  = file_exists(__DIR__ . '/PHPMailer/src/PHPMailer.php');
+    if ($phpmailerOk && file_exists($mailerPath)) {
+      try {
+        require_once $mailerPath;
+        if ($klientaEmail && function_exists('mailPasutijumsKlients'))
+          mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
+        if (function_exists('mailPasutijumsAdmin'))
+          mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+      } catch (\Throwable $e) { error_log('Stripe mail error: ' . $e->getMessage()); }
     }
 
     $_SESSION['cart'] = [];

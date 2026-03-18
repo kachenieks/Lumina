@@ -8,126 +8,138 @@ include __DIR__ . '/includes/header.php';
 ?>
 
 <!-- HERO -->
-<div class="page-header pm-hero">
-  <div class="pm-hero-img"></div>
-  <div class="pm-hero-inner">
-    <div class="section-label">Fotogrāfe</div>
-    <h1>Par <em>mani</em></h1>
-    <p>Katrīna Blažkova — fotogrāfe no Latvijas</p>
+<div class="par-hero">
+  <div class="par-hero-img"></div>
+  <div class="par-hero-overlay"></div>
+  <div class="par-hero-content">
+    <div class="section-label" style="color:var(--gold-light);">Fotogrāfe</div>
+    <h1 class="par-hero-title">
+      Katrīna<br><em>Blažkova</em>
+    </h1>
+    <p class="par-hero-sub">Latvijas fotogrāfe · Kāzas · Portreti · Dzīves mirkļi</p>
   </div>
 </div>
 
-<!-- INTRO -->
-<section class="pm-intro">
-  <div class="pm-intro-grid">
-    <div class="pm-photo-wrap reveal">
-      <div class="pm-photo">
-        <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=85" alt="Katrīna Blažkova">
-      </div>
-      <div class="pm-photo-badge">
-        <div class="pm-badge-num">500+</div>
-        <div class="pm-badge-label">Sesijas</div>
+<!-- INTRO SECTION -->
+<section class="par-intro">
+  <div class="par-intro-grid">
+
+    <div class="par-intro-img reveal">
+      <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80"
+           alt="Katrīna Blažkova — fotogrāfe"
+           style="width:100%;height:clamp(450px,60vw,640px);object-fit:cover;object-position:top;display:block;">
+      <div class="par-intro-badge">
+        <div class="par-badge-num">500+</div>
+        <div class="par-badge-label">Iemūžināti mirkļi</div>
       </div>
     </div>
 
-    <div class="pm-intro-text reveal reveal-delay-1">
-      <div class="section-label">Iepazīstieties</div>
-      <h2 class="section-title">Sveiki, esmu<br><em style="font-style:italic;color:var(--gold)">Katrīna</em></h2>
-      <p>Esmu fotogrāfe no Latvijas, kuras sirds deg par īstiem, autentiskiem mirkļiem. Mana kamera nav tikai instruments — tā ir veids, kā es redzu un saglabāju pasauli ap mums.</p>
-      <p>Specializējos kāzu, portretu un ģimenes fotosesijās. Strādājot ar katru klientu, svarīgākais man ir radīt komfortablu atmosfēru, kurā cilvēki jūtas brīvi — tad rodas patiesākās emocijas un skaistākās fotogrāfijas.</p>
-      <p>Ticēju, ka labas bildes nerodas no perfektas pozes, bet no īstiem smiekliem, pieskaršanās un mirkļiem, kad esat vienkārši jūs paši.</p>
-      <div class="pm-signature">Katrīna Blažkova</div>
+    <div class="par-intro-text reveal reveal-delay-2">
+      <div class="section-label">Par mani</div>
+      <h2 class="section-title" style="margin:14px 0 30px;">
+        Sveiki, esmu<br>
+        <em style="font-style:italic;color:var(--gold)">Katrīna</em>
+      </h2>
+      <p>Esmu fotogrāfe no Latvijas, kura dzīvo un elpo bildēšanu. Man ir īpaša pieeja katram cilvēkam un katrai sesijā — nevis tikai uzņemšana, bet īsta pieredze, kas beidzas ar attēliem, kurus tu glabāsi visu mūžu.</p>
+      <p>Fotografēju kāzas, portretus, ģimenes, pasākumus. Mana darba stils ir naturāls, maigs un emocionāls — bez pārmērīgas pēcapstrādes, bez izlikšanās, tikai tu, kāds tu esi patiesībā.</p>
+      <p>Darbojos visā Latvijā. Īpašos gadījumos arī ārpus tās.</p>
+      <div class="par-contacts" style="margin-top:28px;padding:22px;background:var(--cream2);border-left:3px solid var(--gold);">
+        <div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--grey);margin-bottom:12px;">Sazinies ar mani</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <a href="mailto:katrinablazkova06@gmail.com" style="font-size:13px;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            katrinablazkova06@gmail.com
+          </a>
+          <a href="tel:+37122322130" style="font-size:13px;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.08 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 .95h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.86a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            +371 22 322 130
+          </a>
+        </div>
+      </div>
+      <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap;">
+        <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt sesiju</a>
+        <a href="/4pt/blazkova/lumina/Lumina/portfolio.php" class="btn-outline">Skatīt portfolio</a>
+      </div>
     </div>
+
   </div>
 </section>
 
-<!-- STATS -->
-<div class="pm-stats-bar">
-  <div class="pm-stat reveal">
-    <div class="pm-stat-num">500+</div>
-    <div class="pm-stat-label">Fotosesijas</div>
+<!-- STATS BAR -->
+<div class="par-stats-bar">
+  <div class="par-stat reveal">
+    <div class="par-stat-num">500+</div>
+    <div class="par-stat-label">Fotosesijas</div>
   </div>
-  <div class="pm-stat-divider"></div>
-  <div class="pm-stat reveal reveal-delay-1">
-    <div class="pm-stat-num">5+</div>
-    <div class="pm-stat-label">Gadi pieredzē</div>
+  <div class="par-stat-divider"></div>
+  <div class="par-stat reveal reveal-delay-1">
+    <div class="par-stat-num">6+</div>
+    <div class="par-stat-label">Gadu pieredze</div>
   </div>
-  <div class="pm-stat-divider"></div>
-  <div class="pm-stat reveal reveal-delay-2">
-    <div class="pm-stat-num">200+</div>
-    <div class="pm-stat-label">Kāzu sesijas</div>
+  <div class="par-stat-divider"></div>
+  <div class="par-stat reveal reveal-delay-2">
+    <div class="par-stat-num">100+</div>
+    <div class="par-stat-label">Kāzu sesijas</div>
   </div>
-  <div class="pm-stat-divider"></div>
-  <div class="pm-stat reveal reveal-delay-3">
-    <div class="pm-stat-num">100%</div>
-    <div class="pm-stat-label">Ar sirdi</div>
+  <div class="par-stat-divider"></div>
+  <div class="par-stat reveal reveal-delay-3">
+    <div class="par-stat-num">LV</div>
+    <div class="par-stat-label">Visa Latvija</div>
   </div>
 </div>
 
-<!-- APPROACH -->
-<section class="pm-approach">
-  <div class="pm-approach-header reveal" style="text-align:center;max-width:600px;margin:0 auto clamp(40px,5vw,64px);">
-    <div class="section-label">Mana pieeja</div>
-    <h2 class="section-title">Kā es <em style="font-style:italic;color:var(--gold)">strādāju</em></h2>
+<!-- PROCESS -->
+<section class="par-process">
+  <div style="text-align:center;margin-bottom:clamp(40px,6vw,72px);">
+    <div class="section-label" style="display:flex;justify-content:center;">Kā strādāju</div>
+    <h2 class="section-title" style="margin-top:12px;">Vienkāršs un<br><em style="font-style:italic;color:var(--gold)">personisks process</em></h2>
   </div>
-  <div class="pm-approach-grid">
-    <div class="pm-approach-card reveal">
-      <div class="pm-approach-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-      </div>
-      <h3>Autentiskums</h3>
-      <p>Vislabākās bildes rodas no īstiem mirkļiem. Es nerada poses — es uztver dzīvi tādu, kāda tā ir.</p>
+  <div class="par-steps">
+    <div class="par-step reveal">
+      <div class="par-step-num">01</div>
+      <h3 class="par-step-title">Iepazīšanās</h3>
+      <p class="par-step-desc">Sazinamies, aprunājamies par taviem vēlmēm, stilu un ideālajiem mirkļiem. Varam satikties vai sazināties tiešsaistē.</p>
     </div>
-    <div class="pm-approach-card reveal reveal-delay-1">
-      <div class="pm-approach-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      </div>
-      <h3>Rūpīga sagatavošana</h3>
-      <p>Katru sesiju rūpīgi plānoju — atrodu labāko gaismu, vietu un laiku, lai rezultāts būtu izcils.</p>
+    <div class="par-step reveal reveal-delay-1">
+      <div class="par-step-num">02</div>
+      <h3 class="par-step-title">Plānošana</h3>
+      <p class="par-step-desc">Kopā izvēlamies lokāciju, laiku un konceptu. Es rūpējos par katru detaļu, lai sesija noritētu lieliski.</p>
     </div>
-    <div class="pm-approach-card reveal reveal-delay-2">
-      <div class="pm-approach-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      </div>
-      <h3>Personīga attieksme</h3>
-      <p>Katrs klients saņem pilnu uzmanību. Es ieklausos, saprotu vēlmes un radīšu fotogrāfijas, kas stāsta tieši jūsu stāstu.</p>
+    <div class="par-step reveal reveal-delay-2">
+      <div class="par-step-num">03</div>
+      <h3 class="par-step-title">Fotosesija</h3>
+      <p class="par-step-desc">Sesija notiek dabiskā, relaksētā atmosfērā. Nekas piespiests — tikai īsti mirkļi un sajūtas.</p>
+    </div>
+    <div class="par-step reveal reveal-delay-3">
+      <div class="par-step-num">04</div>
+      <h3 class="par-step-title">Rezultāts</h3>
+      <p class="par-step-desc">Rediģētas fotogrāfijas saņem privātā galerijā 2–3 nedēļu laikā. Mūžīgas atmiņas.</p>
     </div>
   </div>
 </section>
 
-<!-- GALLERY TEASER -->
-<section style="padding:0 0 clamp(60px,8vw,100px);">
-  <div class="pm-gallery-grid">
-    <div class="pm-gallery-item reveal">
-      <img src="https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80" alt="Kāzu fotogrāfija">
-      <div class="pm-gallery-item-overlay"><span>Kāzu fotogrāfija</span></div>
-    </div>
-    <div class="pm-gallery-item pm-gallery-tall reveal reveal-delay-1">
-      <img src="https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&q=80" alt="Portrets">
-      <div class="pm-gallery-item-overlay"><span>Portrets</span></div>
-    </div>
-    <div class="pm-gallery-item reveal reveal-delay-2">
-      <img src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80" alt="Ģimene">
-      <div class="pm-gallery-item-overlay"><span>Ģimene</span></div>
-    </div>
-    <div class="pm-gallery-item reveal reveal-delay-1">
-      <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&q=80" alt="Kāzas">
-      <div class="pm-gallery-item-overlay"><span>Kāzas</span></div>
-    </div>
-  </div>
-</section>
+<!-- QUOTE -->
+<div class="par-quote">
+  <div class="par-quote-mark">"</div>
+  <div class="par-quote-text">Katrā sejā, katrā skatienā un katrā smaidā slēpjas stāsts. Mans uzdevums ir to saglabāt.</div>
+  <div class="par-quote-line"></div>
+  <div class="par-quote-author">Katrīna Blažkova</div>
+</div>
 
 <!-- CTA -->
-<div class="pm-cta">
-  <div class="pm-cta-inner reveal">
-    <div class="section-label" style="color:var(--gold)">Sazināties</div>
-    <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(32px,5vw,56px);font-weight:300;color:#fff;line-height:1.1;margin:14px 0 20px;">Gatavs savai<br><em style="font-style:italic;color:var(--gold-light)">fotosesijai?</em></h2>
-    <p style="font-size:14px;color:rgba(255,255,255,.6);max-width:400px;line-height:1.8;margin-bottom:34px;">Sazinies ar mani un kopā plānosim jūsu ideālo sesiju. Atbildu 24 stundu laikā.</p>
+<section style="padding:clamp(60px,8vw,100px) var(--px);background:var(--ink);position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1551636898-47668aa61de2?w=1400&q=80') center/cover;opacity:.1;"></div>
+  <div style="position:relative;z-index:1;max-width:560px;">
+    <div class="section-label" style="color:var(--gold)">Sāksim kopā</div>
+    <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(34px,5vw,60px);font-weight:300;color:#fff;line-height:1.1;margin:14px 0 20px;">
+      Gatavs savam<br><em style="font-style:italic;color:var(--gold-light)">īpašajam mirklim?</em>
+    </h2>
+    <p style="font-size:14px;color:rgba(255,255,255,.55);line-height:1.8;margin-bottom:32px;max-width:420px;">Sazinies ar mani un kopā veidosim atmiņas, ko glabāsi mūžīgi.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
-      <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt sesiju →</a>
-      <a href="mailto:katrinablazkova06@gmail.com" class="btn-outline" style="border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.75);">Rakstīt e-pastu</a>
+      <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt sesiju</a>
+      <a href="mailto:katrinablazkova06@gmail.com" class="btn-outline" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2);">Rakstīt e-pastu</a>
     </div>
   </div>
-</div>
+</section>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

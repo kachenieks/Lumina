@@ -25,11 +25,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 
   <!-- Desktop links -->
   <ul class="nav-links">
-    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfelis</a></li>
+    <li><a href="/4pt/blazkova/lumina/Lumina/par-mani.php" <?= $currentPage==="par-mani" ? 'class="active"':'' ?>>Par mani</a></li>
+    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfolio</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php" <?= $currentPage==='pakalpojumi' ? 'class="active"':'' ?>>Pakalpojumi</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php"     <?= $currentPage==='veikals'     ? 'class="active"':'' ?>>Veikals</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" <?= $currentPage==='rezervacija' ? 'class="active"':'' ?>>Rezervēt</a></li>
-    <li><a href="/4pt/blazkova/lumina/Lumina/galerijas.php"   <?= $currentPage==='galerijas'   ? 'class="active"':'' ?>>Galerijas</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/index.php#contact">Kontakti</a></li>
   </ul>
 
@@ -62,11 +62,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 <!-- ── MOBILE DRAWER ── -->
 <div class="nav-drawer" id="navDrawer" aria-hidden="true">
   <ul class="drawer-links">
-    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfelis</a></li>
+    <li><a href="/4pt/blazkova/lumina/Lumina/par-mani.php" <?= $currentPage==="par-mani" ? 'class="active"':'' ?>>Par mani</a></li>
+    <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfolio</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php" <?= $currentPage==='pakalpojumi' ? 'class="active"':'' ?>>Pakalpojumi</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php"     <?= $currentPage==='veikals'     ? 'class="active"':'' ?>>Veikals</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" <?= $currentPage==='rezervacija' ? 'class="active"':'' ?>>Rezervēt</a></li>
-    <li><a href="/4pt/blazkova/lumina/Lumina/galerijas.php"   <?= $currentPage==='galerijas'   ? 'class="active"':'' ?>>Galerijas</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/index.php#contact">Kontakti</a></li>
   </ul>
   <div class="drawer-actions">

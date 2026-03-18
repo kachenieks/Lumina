@@ -174,7 +174,7 @@ while ($row = mysqli_fetch_assoc($preces)) $products[] = $row;
 </section>
 
 <!-- BOOKING CTA -->
-<div class="booking-cta reveal">
+<div class="booking-cta">
   <div class="booking-cta-inner">
     <div class="section-label" style="color:var(--gold)">Rezervācijas</div>
     <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(36px,5vw,64px);font-weight:300;color:var(--white);line-height:1.1;margin:14px 0;">Gatavs savai<br><em style="font-style:italic;color:var(--gold-light)">sapņu sesijā?</em></h2>
@@ -182,8 +182,6 @@ while ($row = mysqli_fetch_assoc($preces)) $products[] = $row;
     <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt tagad →</a>
   </div>
 </div>
-
-<?php include __DIR__ . '/includes/footer.php'; ?>
 
 <script>
 // Portfolio lightbox data
@@ -203,3 +201,4 @@ function addToCartAjax(id, name) {
     });
 }
 </script>
+<?php include __DIR__ . '/includes/footer.php'; ?>

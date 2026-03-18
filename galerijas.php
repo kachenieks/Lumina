@@ -45,7 +45,7 @@ if ($klientsId) {
     <div style="font-size:48px;margin-bottom:24px;opacity:.3;">📷</div>
     <h2 style="font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:300;color:var(--ink);margin-bottom:16px;">Vēl nav galeriju</h2>
     <p style="font-size:14px;color:var(--grey);line-height:1.8;margin-bottom:32px;">Pēc fotosesijas mēs augšupielādēsim fotogrāfijas šeit.</p>
-    <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt Sesiju →</a>
+    <a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" class="btn-primary">Rezervēt sesiju →</a>
   </div>
 
   <?php else: ?>

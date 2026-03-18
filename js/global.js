@@ -35,11 +35,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Reveal on scroll
+  // Reveal on scroll — also trigger for already-visible elements
   const ro = new IntersectionObserver(entries => {
     entries.forEach(x => { if (x.isIntersecting) x.target.classList.add('visible'); });
-  }, { threshold: .1 });
-  document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
+  }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => {
+    ro.observe(el);
+    // Immediately show if already in viewport
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      el.classList.add('visible');
+    }
+  });
 
   // Modal backdrop close
   document.querySelectorAll('.modal-overlay').forEach(o => {
