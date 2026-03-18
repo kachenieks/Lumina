@@ -68,13 +68,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
     $uploadSuccess = 'Pasūtījums saņemts!';
   } else { $uploadError = 'Lūdzu pievienojiet fotogrāfiju.'; }
 
-  // PHPMailer — foto pasūtījuma paziņojums
+  // E-pasta paziņojumi — tikai ja PHPMailer ir augšupielādēts
   if ($uploadSuccess) {
     $klientaVards = $_SESSION['klients_vards'] ?? 'Viesis';
     $klientaEmail = $_SESSION['klients_epasts'] ?? '';
-    require_once __DIR__ . '/includes/mailer.php';
-    mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $produkts, $notes, $fotoInfo);
-    if ($klientaEmail) mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $produkts, $notes);
+    $mailerPath = __DIR__ . '/includes/mailer.php';
+    $phpmailerOk = file_exists(__DIR__ . '/PHPMailer/src/PHPMailer.php');
+    if ($phpmailerOk && file_exists($mailerPath)) {
+      try {
+        require_once $mailerPath;
+        if (function_exists('mailFotoPasutijumsAdmin'))
+          mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $produkts, $notes, $fotoInfo);
+        if ($klientaEmail && function_exists('mailFotoPasutijumsKlients'))
+          mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $produkts, $notes);
+      } catch (\Throwable $e) { error_log('Mail error: ' . $e->getMessage()); }
+    }
   }
 }
 
@@ -126,6 +134,11 @@ if (isset($_SESSION['klients_id'])) {
 .editor-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--gold);cursor:pointer;}
 .editor-btn{padding:7px 14px;font-size:11px;border:1px solid var(--border);background:var(--white);border-radius:5px;cursor:pointer;color:var(--grey);transition:.2s;}
 .editor-btn:hover{border-color:var(--gold);color:var(--gold);}
+/* Dark sliders for editor panel */
+.dark-slider{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.12);outline:none;cursor:pointer;transition:background .2s;}
+.dark-slider:hover{background:rgba(255,255,255,.2);}
+.dark-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--gold,#B8975A);cursor:pointer;border:2px solid #1a1a1a;box-shadow:0 0 0 1px rgba(184,151,90,.4);}
+.dark-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--gold,#B8975A);cursor:pointer;border:2px solid #1a1a1a;}
 /* Wall preview */
 .editor-preview-area{display:flex;flex-direction:column;background:#ece9e4;}
 .editor-preview-label{text-align:center;font-size:10px;letter-spacing:3px;color:rgba(0,0,0,.3);text-transform:uppercase;padding:14px;flex-shrink:0;}
@@ -159,7 +172,7 @@ if (isset($_SESSION['klients_id'])) {
 
 <div class="page-header">
   <div class="section-label">Veikals</div>
-  <h1>Mākslas Darbi <em>Jūsu Telpai</em></h1>
+  <h1>Mākslas darbi <em>jūsu telpai</em></h1>
   <p>Iegādājieties gatavus mākslas darbus vai pasūtiet druku no savām fotogrāfijām.</p>
 </div>
 
@@ -186,7 +199,7 @@ if (isset($_SESSION['klients_id'])) {
 <!-- Upload CTA -->
 <section class="upload-section">
   <div class="upload-cta-content reveal">
-    <div class="section-label" style="display:flex;justify-content:center;">Personalizēts Pasūtījums</div>
+    <div class="section-label" style="display:flex;justify-content:center;">Personalizēts pasūtījums</div>
     <h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(32px,5vw,52px);font-weight:300;color:var(--ink);margin:14px 0;">
       Redziet, kā izskatīsies<br><em style="font-style:italic;color:var(--gold)">jūsu foto uz sienas</em>
     </h2>
@@ -386,28 +399,51 @@ if (isset($_SESSION['klients_id'])) {
         </div>
 
         <!-- Sliders -->
-        <div class="editor-controls" id="editorControls" style="display:none;flex-direction:column;gap:10px;padding:18px 22px;background:#f5f3ef;border-top:1px solid var(--border,#e5e0d8);">
-          <div class="control-group">
-            <label class="control-label">🔍 Tālummaiņa</label>
-            <input type="range" id="zoomSlider" min="50" max="300" value="100" class="editor-slider" oninput="applyTransform()">
-            <span id="zoomVal" class="control-val">100%</span>
+        <div class="editor-controls" id="editorControls" style="display:none;flex-direction:column;gap:0;border-top:2px solid var(--gold,#B8975A);">
+          <div style="padding:10px 20px 6px;background:#1C1C1C;">
+            <span style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.4);">Pielāgot fotogrāfiju</span>
           </div>
-          <div class="control-group">
-            <label class="control-label">↔ Horizontāli</label>
-            <input type="range" id="posX" min="-200" max="200" value="0" class="editor-slider" oninput="applyTransform()">
+          <div style="background:#1a1a1a;padding:14px 20px;display:flex;flex-direction:column;gap:12px;">
+            <!-- Zoom -->
+            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
+              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Tālummaiņa">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
+              </div>
+              <input type="range" id="zoomSlider" min="50" max="300" value="100" class="editor-slider dark-slider" oninput="applyTransform()">
+              <span id="zoomVal" style="font-size:11px;color:var(--gold,#B8975A);font-family:monospace;text-align:right;white-space:nowrap;">100%</span>
+            </div>
+            <!-- Horizontal -->
+            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
+              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Horizontāli">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M15 8l4 4-4 4M9 8l-4 4 4 4"/></svg>
+              </div>
+              <input type="range" id="posX" min="-200" max="200" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
+              <span id="posXVal" style="font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;text-align:right;white-space:nowrap;">0</span>
+            </div>
+            <!-- Vertical -->
+            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
+              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Vertikāli">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M8 15l4 4 4-4M8 9l4-4 4 4"/></svg>
+              </div>
+              <input type="range" id="posY" min="-200" max="200" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
+              <span id="posYVal" style="font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;text-align:right;white-space:nowrap;">0</span>
+            </div>
+            <!-- Rotation -->
+            <div class="control-group" style="display:grid;grid-template-columns:28px 1fr 44px;gap:10px;align-items:center;">
+              <div style="color:rgba(255,255,255,.5);font-size:15px;text-align:center;" title="Rotācija">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+              </div>
+              <input type="range" id="rotSlider" min="-180" max="180" value="0" class="editor-slider dark-slider" oninput="applyTransform()">
+              <span id="rotVal" style="font-size:11px;color:var(--gold,#B8975A);font-family:monospace;text-align:right;white-space:nowrap;">0°</span>
+            </div>
           </div>
-          <div class="control-group">
-            <label class="control-label">↕ Vertikāli</label>
-            <input type="range" id="posY" min="-200" max="200" value="0" class="editor-slider" oninput="applyTransform()">
-          </div>
-          <div class="control-group">
-            <label class="control-label">↩ Rotācija</label>
-            <input type="range" id="rotSlider" min="-180" max="180" value="0" class="editor-slider" oninput="applyTransform()">
-            <span id="rotVal" class="control-val">0°</span>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="editor-btn" onclick="resetTransform()">↺ Atiestatīt</button>
-            <button class="editor-btn" onclick="fitPhoto()">⬜ Pielāgot rāmim</button>
+          <div style="display:flex;gap:1px;background:#111;">
+            <button class="editor-btn dark-btn" onclick="resetTransform()" style="flex:1;padding:10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:none;background:#252525;color:rgba(255,255,255,.45);cursor:pointer;transition:.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.45)'">
+              Atiestatīt
+            </button>
+            <button class="editor-btn dark-btn" onclick="fitPhoto()" style="flex:1;padding:10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:none;background:#2a2520;color:var(--gold,#B8975A);cursor:pointer;transition:.2s;" onmouseover="this.style.background='#B8975A';this.style.color='#fff'" onmouseout="this.style.background='#2a2520';this.style.color='var(--gold,#B8975A)'">
+              Pielāgot rāmim
+            </button>
           </div>
         </div>
 
@@ -580,10 +616,13 @@ function applyTransform(){
   const rot=document.getElementById('rotSlider').value;
   document.getElementById('zoomVal').textContent=zoom+'%';
   document.getElementById('rotVal').textContent=rot+'°';
+  const pxv=document.getElementById('posXVal');
+  const pyv=document.getElementById('posYVal');
+  if(pxv) pxv.textContent=px;
+  if(pyv) pyv.textContent=py;
   canvas.style.transform=`translate(${px}px,${py}px) scale(${zoom/100}) rotate(${rot}deg)`;
-  // Also update container background if used
   const container=document.getElementById('photoContainer');
-  if(container.style.backgroundImage){
+  if(container && container.style.backgroundImage){
     container.style.backgroundPosition=`calc(50% + ${px}px) calc(50% + ${py}px)`;
     container.style.backgroundSize=`${zoom}%`;
   }

@@ -51,3 +51,29 @@ CREATE TABLE IF NOT EXISTS `galeriju_foto` (
 
 -- ── 4. KLIENTI — pievieno izveidots kolonnu ja nav ──────────
 ALTER TABLE `klienti` ADD COLUMN `izveidots` datetime DEFAULT CURRENT_TIMESTAMP;
+
+-- ── 5. PRECES (veikala produkti) ──────────────────────────
+CREATE TABLE IF NOT EXISTS `preces` (
+  `id`          int(11)      NOT NULL AUTO_INCREMENT,
+  `nosaukums`   varchar(255) NOT NULL,
+  `apraksts`    text         DEFAULT NULL,
+  `cena`        decimal(8,2) NOT NULL DEFAULT '0.00',
+  `kategorija`  varchar(100) DEFAULT '',
+  `attels_url`  varchar(500) DEFAULT '',
+  `bestseller`  tinyint(1)   DEFAULT 0,
+  `aktivs`      tinyint(1)   DEFAULT 1,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Pievieno produktus ja tabulā nav neviena
+INSERT INTO `preces` (`nosaukums`, `apraksts`, `cena`, `kategorija`, `attels_url`, `bestseller`, `aktivs`)
+SELECT * FROM (VALUES
+  ROW('Personalizēts portrets', 'Drukāts portrets uz foto papīra. Augsta izšķirtspēja, ilgstoša krāsu noturība.', 65.00, 'Druka', 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80', 1, 1),
+  ROW('Kāzu fotodruka 30×40', 'Kāzu mirklis uz luksusa foto papīra. Piegādājam rāmī.', 49.00, 'Druka', 'https://images.unsplash.com/photo-1519741497674-611481863552?w=600&q=80', 0, 1),
+  ROW('Canvas 50×70', 'Fotoattēls uz audekla ar rāmi, gatavs karināšanai.', 79.00, 'Audekls', 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80', 1, 1),
+  ROW('Canvas 80×120', 'Liela formāta audekla druka — iespaidīga sienas dekorācija.', 139.00, 'Audekls', 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80', 0, 1),
+  ROW('Sienas panelis 60×90', 'Alumīnija panelis ar spīdīgu virsmu. Moderns, bez rāmja.', 149.00, 'Metāls', 'https://images.unsplash.com/photo-1551376347-075b0121a65b?w=600&q=80', 0, 1),
+  ROW('Fotograāmata 30×30', 'Cietie vāki, 30 lapas iekļautas. Ideāla dāvana vai kāzu albums.', 129.00, 'Albums', 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', 0, 1)
+) AS new_rows (nosaukums, apraksts, cena, kategorija, attels_url, bestseller, aktivs)
+WHERE NOT EXISTS (SELECT 1 FROM `preces` LIMIT 1);
+
