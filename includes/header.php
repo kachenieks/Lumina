@@ -29,7 +29,6 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
     <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfolio</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php" <?= $currentPage==='pakalpojumi' ? 'class="active"':'' ?>>Pakalpojumi</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php"     <?= $currentPage==='veikals'     ? 'class="active"':'' ?>>Veikals</a></li>
-    <li><a href="/4pt/blazkova/lumina/Lumina/pasutit.php"    <?= $currentPage==='pasutit'     ? 'class="active"':''  ?>>Pasūtīt</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" <?= $currentPage==='rezervacija' ? 'class="active"':'' ?>>Rezervēt</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/index.php#contact">Kontakti</a></li>
   </ul>
@@ -67,7 +66,6 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
     <li><a href="/4pt/blazkova/lumina/Lumina/portfolio.php"   <?= $currentPage==='portfolio'   ? 'class="active"':'' ?>>Portfolio</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/pakalpojumi.php" <?= $currentPage==='pakalpojumi' ? 'class="active"':'' ?>>Pakalpojumi</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/veikals.php"     <?= $currentPage==='veikals'     ? 'class="active"':'' ?>>Veikals</a></li>
-    <li><a href="/4pt/blazkova/lumina/Lumina/pasutit.php"    <?= $currentPage==='pasutit'     ? 'class="active"':''  ?>>Pasūtīt</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/rezervacija.php" <?= $currentPage==='rezervacija' ? 'class="active"':'' ?>>Rezervēt</a></li>
     <li><a href="/4pt/blazkova/lumina/Lumina/index.php#contact">Kontakti</a></li>
   </ul>
