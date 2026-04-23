@@ -34,10 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     mysqli_stmt_bind_param($stmt, 'isssssd', $klienta_id, $pakalpojums, $datums, $laiks, $vieta, $papildu, $cena);
     if (mysqli_stmt_execute($stmt)) {
       $success = 'Pieteikums nosūtīts! Apstiprinājums nosūtīts uz jūsu e-pastu.';
-      $klientaVards = isset($_SESSION['klients_vards']) ? $_SESSION['klients_vards'] : 'Viesis';
-      $klientaEmail = isset($_SESSION['klients_epasts']) ? $_SESSION['klients_epasts'] : '';
-      // Fetch client phone
-      $talrunis = '';
+      // Use session data if logged in, otherwise fall back to form fields (guests)
+      $klientaVards = isset($_SESSION['klients_vards'])
+        ? $_SESSION['klients_vards']
+        : escape($savienojums, trim($_POST['vards'] ?? 'Viesis'));
+      $klientaEmail = isset($_SESSION['klients_epasts'])
+        ? $_SESSION['klients_epasts']
+        : escape($savienojums, trim($_POST['epasts'] ?? ''));
+      // Also get talrunis from form for guests
+      if (!isset($_SESSION['klients_id'])) {
+        $talrunis = escape($savienojums, trim($_POST['talrunis'] ?? ''));
+      }
+      // Fetch client phone (logged-in) or keep form value (guest)
       if (isset($_SESSION['klients_id'])) {
         $kl = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT talrunis FROM klienti WHERE id=" . (int)$_SESSION['klients_id']));
         $talrunis = $kl['talrunis'] ?? '';

@@ -239,9 +239,13 @@ if (isset($_SESSION['klients_id'])) {
 .album-page-indicator{font-size:10px;letter-spacing:2px;color:rgba(0,0,0,.35);text-transform:uppercase;min-width:80px;text-align:center;}
 /* Thumbnail strip */
 .album-strip{display:flex;gap:6px;overflow-x:auto;padding:4px 8px;z-index:3;max-width:100%;}
-.album-strip-thumb{width:44px;height:44px;flex-shrink:0;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.15s;opacity:.6;}
+.album-strip-thumb{width:44px;height:44px;flex-shrink:0;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.15s;opacity:.6;user-select:none;}
 .album-strip-thumb.active{border-color:var(--gold);opacity:1;}
-.album-strip-thumb img{width:100%;height:100%;object-fit:cover;}
+.album-strip-thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none;}
+.album-strip-thumb.sortable-ghost{opacity:.25;border-color:var(--gold);}
+.album-strip-thumb.sortable-chosen{border-color:var(--gold);opacity:1;box-shadow:0 4px 12px rgba(0,0,0,.2);}
+.drag-hint{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:1px;text-align:center;margin-top:2px;display:none;}
+.drag-hint.show{display:block;}
 /* Responsive */
 @media(max-width:900px){
   .editor-layout{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
@@ -521,8 +525,9 @@ if (isset($_SESSION['klients_id'])) {
             <div class="album-page-indicator" id="albumPageIndicator">Vāks</div>
             <button class="album-nav-btn" id="albumNext" onclick="albumNav(1)">›</button>
           </div>
-          <!-- Thumbnail strip -->
+          <!-- Thumbnail strip (drag to reorder) -->
           <div class="album-strip" id="albumStrip"></div>
+          <div class="drag-hint" id="albumDragHint">&#8596; Velciet lai mainītu secību</div>
         </div>
 
       </div><!-- /preview -->
@@ -808,9 +813,33 @@ function renderAlbumStrip() {
   if (!strip) return;
   strip.innerHTML = editorPhotos.map((p, i) => `
     <div class="album-strip-thumb ${currentAlbumThumb(i) ? 'active' : ''}"
-      onclick="jumpToAlbumPhoto(${i})">
+      data-idx="${i}" onclick="jumpToAlbumPhoto(${i})">
       <img src="${p.src}" alt="">
     </div>`).join('');
+
+  // Destroy old Sortable instance if exists
+  if (strip._sortable) strip._sortable.destroy();
+
+  // Init drag & drop reorder
+  if (typeof Sortable !== 'undefined' && editorPhotos.length > 1) {
+    strip._sortable = Sortable.create(strip, {
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      direction: 'horizontal',
+      onEnd: function(evt) {
+        // Reorder editorPhotos array
+        const moved = editorPhotos.splice(evt.oldIndex, 1)[0];
+        editorPhotos.splice(evt.newIndex, 0, moved);
+        renderAlbumStrip();
+        renderAlbum();
+        updateFotoCounter();
+      }
+    });
+    // Show drag hint
+    const hint = document.getElementById('albumDragHint');
+    if (hint) hint.classList.add('show');
+  }
 }
 
 function currentAlbumThumb(i) {
@@ -989,4 +1018,5 @@ if (dz) {
 <?php if(isset($_GET['cancelled'])): ?>window.addEventListener('DOMContentLoaded',()=>showToast('Maksājums atcelts.','error'));<?php endif; ?>
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <?php include __DIR__ . '/includes/footer.php'; ?>

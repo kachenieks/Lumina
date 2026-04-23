@@ -163,54 +163,131 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
     $pasutijumi = [];
     $pRes = mysqli_query($savienojums, "SELECT * FROM pasutijumi WHERE klienta_id=$klientsId ORDER BY izveidots DESC");
     while ($p = mysqli_fetch_assoc($pRes)) $pasutijumi[] = $p;
+
+    function getProfFotos(array $p): array {
+      $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
+      $photos = [];
+      if (!empty($p['foto_urls'])) {
+        $arr = json_decode($p['foto_urls'], true) ?: [];
+        foreach ($arr as $u) {
+          if (trim($u) === '') continue;
+          $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+        }
+      }
+      if (empty($photos) && !empty($p['foto_fails'])) {
+        $photos[] = filter_var($p['foto_fails'], FILTER_VALIDATE_URL) ? $p['foto_fails'] : $base . $p['foto_fails'];
+      }
+      return array_values(array_unique($photos));
+    }
     ?>
+    <style>
+    .prl-card{background:var(--white);border:1px solid var(--grey3);display:flex;gap:0;overflow:hidden;margin-bottom:14px;transition:box-shadow .2s;}
+    .prl-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);}
+    .prl-photos{flex-shrink:0;width:130px;display:flex;flex-direction:column;gap:2px;background:var(--cream2);overflow:hidden;}
+    .prl-main-img{width:130px;height:130px;object-fit:cover;display:block;cursor:pointer;transition:opacity .2s;}
+    .prl-main-img:hover{opacity:.85;}
+    .prl-thumbs{display:flex;gap:2px;padding:2px;}
+    .prl-thumb{width:40px;height:40px;object-fit:cover;cursor:pointer;transition:.15s;flex-shrink:0;}
+    .prl-thumb:hover{opacity:.75;transform:scale(1.06);}
+    .prl-more{width:40px;height:40px;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;cursor:pointer;flex-shrink:0;font-weight:600;}
+    #plx{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;align-items:center;justify-content:center;flex-direction:column;}
+    #plx.open{display:flex;}
+    #plx img.main{max-width:90vw;max-height:78vh;object-fit:contain;border:1px solid rgba(255,255,255,.08);}
+    #plx-strip{display:flex;gap:6px;margin-top:12px;overflow-x:auto;max-width:90vw;padding-bottom:4px;}
+    #plx-strip img{width:56px;height:56px;object-fit:cover;cursor:pointer;opacity:.4;border:2px solid transparent;transition:.15s;flex-shrink:0;}
+    #plx-strip img.active{opacity:1;border-color:#B8975A;}
+    #plx-info{color:rgba(255,255,255,.45);font-size:11px;margin-top:8px;letter-spacing:1px;}
+    #plx-close{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;opacity:.7;line-height:1;}
+    #plx-close:hover{opacity:1;}
+    #plx-btns{display:flex;gap:10px;margin-top:14px;align-items:center;}
+    .plx-nav{background:none;border:1px solid rgba(255,255,255,.25);color:#fff;padding:7px 22px;cursor:pointer;font-size:18px;transition:.15s;}
+    .plx-nav:hover{background:#B8975A;border-color:#B8975A;}
+    .plx-dl{padding:8px 22px;background:#B8975A;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;}
+    </style>
+
     <div>
       <?php if (empty($pasutijumi)): ?>
       <div style="text-align:center;padding:60px;color:var(--grey);">
-        <div style="font-size:40px;opacity:.3;margin-bottom:16px;">🛍️</div>
-        <p>Jums vēl nav pasūtījumu.</p>
-        <a href="/4pt/blazkova/lumina/Lumina/veikals.php" class="btn-primary" style="display:inline-block;margin-top:20px;">Uz veikalu →</a>
+        <div style="font-size:40px;opacity:.3;margin-bottom:16px;">&#128717;</div>
+        <p>Jums v&#275;l nav pas&#363;t&#299;jumu.</p>
+        <a href="/4pt/blazkova/lumina/Lumina/veikals.php" class="btn-primary" style="display:inline-block;margin-top:20px;">Uz veikalu &rarr;</a>
       </div>
       <?php else: ?>
-      <div style="display:flex;flex-direction:column;gap:16px;">
-        <?php foreach ($pasutijumi as $p):
-          $sc = ['jauns'=>'#e67e22','apstiprinats'=>'#27ae60','pabeigts'=>'#2980b9','atcelts'=>'#c0392b','apmaksats'=>'#8e44ad'];
-          $sl = $p['statuss'] ?? 'jauns';
-          $sl_label = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprināts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaksāts'];
-          // Photo src
-          $fotoSrc = null;
-          if (!empty($p['foto_fails'])) {
-            if (filter_var($p['foto_fails'], FILTER_VALIDATE_URL)) {
-              $fotoSrc = $p['foto_fails'];
-            } else {
-              $fotoSrc = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $p['foto_fails'];
-            }
-          }
-        ?>
-        <div style="background:var(--white);border:1px solid var(--grey3);display:flex;gap:0;overflow:hidden;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
-          <?php if ($fotoSrc): ?>
-          <div style="width:110px;flex-shrink:0;">
-            <img src="<?= htmlspecialchars($fotoSrc) ?>" alt="" style="width:110px;height:110px;object-fit:cover;display:block;">
-          </div>
-          <?php else: ?>
-          <div style="width:110px;height:110px;flex-shrink:0;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:32px;opacity:.25;">🖼️</div>
-          <?php endif; ?>
-          <div style="padding:16px 20px;flex:1;min-width:0;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-              <div style="font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--ink);"><?= htmlspecialchars($p['produkts']) ?></div>
-              <span style="font-size:9px;padding:4px 10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:<?= ($sc[$sl]??'#999') ?>18;color:<?= $sc[$sl]??'#999' ?>;flex-shrink:0;"><?= $sl_label[$sl]??ucfirst($sl) ?></span>
-            </div>
-            <?php if (!empty($p['papildu_info'])): ?>
-            <div style="font-size:12px;color:var(--grey);margin-top:6px;"><?= htmlspecialchars($p['papildu_info']) ?></div>
+      <?php foreach ($pasutijumi as $p):
+        $sc = ['jauns'=>'#e67e22','apstiprinats'=>'#27ae60','pabeigts'=>'#2980b9','atcelts'=>'#c0392b','apmaksats'=>'#8e44ad'];
+        $sl = $p['statuss'] ?? 'jauns';
+        $sl_label = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprin&#257;ts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaks&#257;ts'];
+        $photos = getProfFotos($p);
+        $pc = count($photos);
+        $pj = json_encode($photos);
+        $pt = json_encode(htmlspecialchars($p['produkts']));
+      ?>
+      <div class="prl-card">
+        <div class="prl-photos">
+          <?php if ($pc > 0): ?>
+          <img src="<?= htmlspecialchars($photos[0]) ?>" class="prl-main-img" alt=""
+            onclick="plxOpen(<?= $pj ?>,0,<?= $pt ?>)"
+            onerror="this.style.background='var(--cream2)';this.style.display='none'">
+          <?php if ($pc > 1): ?>
+          <div class="prl-thumbs">
+            <?php for($ti=1;$ti<=min(2,$pc-1);$ti++): ?>
+            <img src="<?= htmlspecialchars($photos[$ti]) ?>" class="prl-thumb"
+              onclick="plxOpen(<?= $pj ?>,<?= $ti ?>,<?= $pt ?>)"
+              onerror="this.style.display='none'">
+            <?php endfor; ?>
+            <?php if($pc>3): ?>
+            <div class="prl-more" onclick="plxOpen(<?= $pj ?>,3,<?= $pt ?>)">+<?= $pc-3 ?></div>
             <?php endif; ?>
-            <div style="font-size:11px;color:var(--grey2);margin-top:8px;"><?= date('d.m.Y H:i', strtotime($p['izveidots'])) ?></div>
           </div>
+          <?php endif; ?>
+          <?php else: ?>
+          <div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:.18;">&#128247;</div>
+          <?php endif; ?>
         </div>
-        <?php endforeach; ?>
+        <div style="padding:16px 20px;flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--ink);"><?= htmlspecialchars($p['produkts']) ?></div>
+            <span style="font-size:9px;padding:4px 10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:<?= ($sc[$sl]??'#999') ?>18;color:<?= $sc[$sl]??'#999' ?>;flex-shrink:0;"><?= $sl_label[$sl]??ucfirst($sl) ?></span>
+          </div>
+          <?php if($pc>0): ?>
+          <div style="font-size:11px;color:var(--grey);margin-bottom:6px;">
+            <?= $pc ?> foto &middot; <span style="color:var(--gold);cursor:pointer;" onclick="plxOpen(<?= $pj ?>,0,<?= $pt ?>)">Skat&#299;t visu &rarr;</span>
+          </div>
+          <?php endif; ?>
+          <?php if(!empty($p['papildu_info'])): ?>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px;"><?= htmlspecialchars($p['papildu_info']) ?></div>
+          <?php endif; ?>
+          <div style="font-size:11px;color:var(--grey2);margin-top:10px;"><?= date('d.m.Y H:i',strtotime($p['izveidots'])) ?></div>
+        </div>
       </div>
+      <?php endforeach; ?>
       <?php endif; ?>
     </div>
 
+    <!-- Lightbox -->
+    <div id="plx" onclick="if(event.target===this)plxClose()">
+      <button id="plx-close" onclick="plxClose()">&#10005;</button>
+      <img class="main" id="plx-img" src="" alt="">
+      <div id="plx-strip"></div>
+      <div id="plx-info"></div>
+      <div id="plx-btns">
+        <button class="plx-nav" onclick="plxNav(-1)">&#8249;</button>
+        <a class="plx-dl" id="plx-dl" href="#" download>&#11015; Lej.l&#257;d&#275;t</a>
+        <button class="plx-nav" onclick="plxNav(1)">&#8250;</button>
+      </div>
+    </div>
+    <script>
+    var _P=[],_C=0,_T='';
+    function plxOpen(p,i,t){_P=p;_C=i;_T=t;document.getElementById('plx').classList.add('open');document.body.style.overflow='hidden';_plxS(i);}
+    function plxClose(){document.getElementById('plx').classList.remove('open');document.body.style.overflow='';}
+    function _plxS(i){if(i<0)i=_P.length-1;if(i>=_P.length)i=0;_C=i;
+      var im=document.getElementById('plx-img');im.src=_P[i];
+      document.getElementById('plx-info').textContent=_T+' — '+(i+1)+' / '+_P.length;
+      var dl=document.getElementById('plx-dl');dl.href=_P[i];dl.download='lumina_foto_'+(i+1)+'.jpg';
+      document.getElementById('plx-strip').innerHTML=_P.map(function(p,j){return'<img src="'+p+'" class="'+(j===i?'active':'')+'" onclick="_plxS('+ j +')" onerror="this.style.display=\'none\'">';}).join('');}
+    function plxNav(d){_plxS(_C+d);}
+    document.addEventListener('keydown',function(e){if(!document.getElementById('plx').classList.contains('open'))return;if(e.key==='ArrowLeft')plxNav(-1);else if(e.key==='ArrowRight')plxNav(1);else if(e.key==='Escape')plxClose();});
+    </script>
     <!-- ── GALERIJAS ── -->
     <?php elseif ($activeTab === 'galerijas'): ?>
     <div>
