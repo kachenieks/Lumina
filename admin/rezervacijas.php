@@ -12,11 +12,48 @@ if (isset($_GET['status'])) {
   $id = (int)$_GET['id'];
   $status = escape($savienojums, $_GET['status']);
   mysqli_query($savienojums, "UPDATE rezervacijas SET statuss='$status' WHERE id=$id");
-  $rez = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT r.*, k.epasts, k.vards FROM rezervacijas r LEFT JOIN klienti k ON r.klienta_id=k.id WHERE r.id=$id"));
-  if ($rez && $rez['epasts']) {
-    try { require_once __DIR__ . '/../includes/mailer.php'; mailRezervacijaStatuss($rez['epasts'], $rez['vards'], $rez, $status); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
+  $rez = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT r.*, k.epasts, k.vards, k.talrunis FROM rezervacijas r LEFT JOIN klienti k ON r.klienta_id=k.id WHERE r.id=$id"));
+  // Determine recipient — registered client or viesis
+  $recipEmail = ($rez['epasts'] ?? '') ?: ($rez['viesis_epasts'] ?? '');
+  $recipVards = ($rez['vards'] ?? '') ?: ($rez['viesis_vards'] ?? 'Viesis');
+  if ($rez && $recipEmail) {
+    try { require_once __DIR__ . '/../includes/mailer.php'; mailRezervacijaStatuss($recipEmail, $recipVards, $rez, $status); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
   }
   header('Location: /4pt/blazkova/lumina/Lumina/admin/rezervacijas.php?msg=updated'); exit;
+}
+
+// Create gallery from reservation
+if (isset($_GET['create_gallery'])) {
+  $rezId = (int)$_GET['create_gallery'];
+  $rez = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT r.*, k.id as kid, k.vards, k.uzvards, k.epasts FROM rezervacijas r LEFT JOIN klienti k ON r.klienta_id=k.id WHERE r.id=$rezId"));
+  if ($rez) {
+    $nosaukums = escape($savienojums, ($rez['vards'] ? $rez['vards'].' '.$rez['uzvards'] : ($rez['viesis_vards'] ?? 'Viesis')) . ' — ' . date('d.m.Y', strtotime($rez['datums'])));
+    $deriga    = date('Y-m-d', strtotime('+90 days'));
+    $klientaId = (int)($rez['kid'] ?? 0);
+
+    // Generate access code for guests
+    $kods = $klientaId ? null : strtoupper(substr(md5(uniqid()), 0, 8));
+    $kodsEsc = $kods ? "'$kods'" : 'NULL';
+
+    // Viesis email
+    $vEmail = escape($savienojums, $rez['epasts'] ?: ($rez['viesis_epasts'] ?? ''));
+    $vEmailVal = $vEmail ? "'$vEmail'" : 'NULL';
+
+    mysqli_query($savienojums, "INSERT INTO galerijas (klienta_id, nosaukums, foto_skaits, deriga_lidz, izveidota, piekluves_kods, viesis_epasts) VALUES ($klientaId,'$nosaukums',0,'$deriga',NOW(),$kodsEsc,$vEmailVal)");
+    $newGalId = mysqli_insert_id($savienojums);
+
+    // Send access code to viesis by email
+    if ($kods && $vEmail) {
+      try {
+        require_once __DIR__ . '/../includes/mailer.php';
+        if (function_exists('mailGalerijaViesis')) {
+          mailGalerijaViesis($vEmail, $rez['viesis_vards'] ?? 'Klients', $nosaukums, $kods);
+        }
+      } catch(\Throwable $e) { error_log('Gallery mail err: '.$e->getMessage()); }
+    }
+
+    header('Location: /4pt/blazkova/lumina/Lumina/admin/galerijas.php?view='.$newGalId.'&msg=saved'); exit;
+  }
 }
 
 // Delete
@@ -96,9 +133,19 @@ include __DIR__ . '/includes/header.php';
       <tr>
         <td style="color:var(--grey2);font-size:11px;"><?= $r['id'] ?></td>
         <td>
-          <strong><?= $r['vards'] ? htmlspecialchars($r['vards'].' '.$r['uzvards']) : '<em style="color:var(--grey2)">Viesis</em>' ?></strong>
-          <?php if ($r['epasts']): ?><div style="font-size:11px;color:var(--grey2);"><?= htmlspecialchars($r['epasts']) ?></div><?php endif; ?>
-          <?php if ($r['talrunis']): ?><div style="font-size:11px;color:var(--grey2);"><?= htmlspecialchars($r['talrunis']) ?></div><?php endif; ?>
+          <?php
+          $displayVards = $r['vards'] ? htmlspecialchars($r['vards'].' '.$r['uzvards']) : ($r['viesis_vards'] ?? '');
+          $displayEmail = $r['epasts'] ?: ($r['viesis_epasts'] ?? '');
+          $displayTalr  = $r['talrunis'] ?: ($r['viesis_talrunis'] ?? '');
+          ?>
+          <?php if ($r['vards']): ?>
+          <strong><?= htmlspecialchars($r['vards'].' '.$r['uzvards']) ?></strong>
+          <?php else: ?>
+          <em style="color:var(--grey2);">Viesis</em>
+          <?php if (!empty($r['viesis_vards'])): ?><strong style="color:var(--ink);font-style:normal;"> <?= htmlspecialchars($r['viesis_vards']) ?></strong><?php endif; ?>
+          <?php endif; ?>
+          <?php if ($displayEmail): ?><div style="font-size:11px;color:var(--grey2);"><?= htmlspecialchars($displayEmail) ?></div><?php endif; ?>
+          <?php if ($displayTalr): ?><div style="font-size:11px;color:var(--grey2);"><?= htmlspecialchars($displayTalr) ?></div><?php endif; ?>
         </td>
         <td style="max-width:160px;font-size:13px;"><?= htmlspecialchars($r['pakalpojums']) ?></td>
         <td><?= date('d.m.Y', strtotime($r['datums'])) ?><br><small style="color:var(--grey2);"><?= substr($r['laiks'],0,5) ?></small></td>
@@ -126,6 +173,12 @@ include __DIR__ . '/includes/header.php';
                onclick="return confirm('Atzīmēt kā pabeigtu? Klients saņems paziņojumu.')"
                style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#e8f4fd;color:#1565c0;border:1px solid #90caf9;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
                title="Sesija pabeigta — klients saņems e-pastu">✔ Pabeigts</a>
+            <?php endif; ?>
+            <?php if ($sl === 'pabeigts'): ?>
+            <a href="?create_gallery=<?= $r['id'] ?>&tab=rezervacijas"
+               onclick="return confirm('Izveidot jaunu galeriju šim klientam?')"
+               style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
+               title="Izveidot galeriju un nosūtīt piekļuves kodu">📁 Galeriju</a>
             <?php endif; ?>
             <?php if ($sl !== 'atcelts'): ?>
             <a href="?status=atcelts&id=<?= $r['id'] ?>&tab=rezervacijas"

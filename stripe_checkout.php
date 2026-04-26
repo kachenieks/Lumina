@@ -152,13 +152,15 @@ if ($action === 'success') {
 
     // Save each cart item to pasutijumi table
     foreach ($_SESSION['cart'] as $cartItem) {
-      $prod  = escape($savienojums, $cartItem['name'] ?? '');
-      $foto  = escape($savienojums, $cartItem['foto_url'] ?? '');
-      $notes = escape($savienojums, $cartItem['notes'] ?? ('Stripe #' . $orderId . ' €' . $totalFmt));
-      $crop  = escape($savienojums, $cartItem['crop_data'] ?? '');
+      $prod     = escape($savienojums, $cartItem['name'] ?? '');
+      $foto     = escape($savienojums, $cartItem['foto_url'] ?? '');
+      $fotoUrls = escape($savienojums, $cartItem['foto_urls'] ?? '');
+      $notes    = escape($savienojums, $cartItem['notes'] ?? ('Stripe #' . $orderId . ' €' . $totalFmt));
+      $crop     = escape($savienojums, $cartItem['crop_data'] ?? '');
+      $vEmail   = escape($savienojums, $klientaEmail);
       @mysqli_query($savienojums,
-        "INSERT INTO pasutijumi (klienta_id, produkts, foto_fails, crop_data, papildu_info, statuss, izveidots)
-         VALUES ($klientsId, '$prod', '$foto', '$crop', '$notes', 'apmaksats', NOW())"
+        "INSERT INTO pasutijumi (klienta_id, produkts, foto_fails, foto_urls, crop_data, papildu_info, viesis_epasts, statuss, izveidots)
+         VALUES ($klientsId, '$prod', '$foto', '$fotoUrls', '$crop', '$notes', '$vEmail', 'apmaksats', NOW())"
       );
     }
 

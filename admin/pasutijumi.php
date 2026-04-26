@@ -37,7 +37,7 @@ $filter = $_GET['filter'] ?? '';
 $where = $filter ? "WHERE p.statuss='".escape($savienojums,$filter)."'" : '';
 $orders = [];
 $res = mysqli_query($savienojums,
-  "SELECT p.*, k.vards, k.uzvards, k.epasts
+  "SELECT p.*, k.vards, k.uzvards, k.epasts, p.viesis_epasts
    FROM pasutijumi p
    LEFT JOIN klienti k ON p.klienta_id = k.id
    $where
@@ -52,23 +52,32 @@ function getOrderPhotos(array $o): array {
   $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
   $photos = [];
 
-  // foto_urls JSON array (albums)
+  // foto_urls — can be JSON array OR a single URL string
   if (!empty($o['foto_urls'])) {
-    $arr = json_decode($o['foto_urls'], true) ?: [];
-    foreach ($arr as $u) {
-      if (trim($u) === '') continue;
-      $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+    $raw = $o['foto_urls'];
+    // Try JSON array first
+    $arr = json_decode($raw, true);
+    if (is_array($arr)) {
+      foreach ($arr as $u) {
+        $u = trim($u);
+        if ($u === '') continue;
+        $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+      }
+    } else {
+      // Plain URL string
+      $u = trim($raw);
+      if ($u !== '') $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
     }
   }
 
-  // Single foto_fails (non-album)
-  if (!empty($o['foto_fails']) && empty($photos)) {
-    $photos[] = filter_var($o['foto_fails'], FILTER_VALIDATE_URL)
-      ? $o['foto_fails']
-      : $base . $o['foto_fails'];
+  // Single foto_fails (non-album or fallback)
+  if (!empty($o['foto_fails'])) {
+    $u = trim($o['foto_fails']);
+    $resolved = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
+    if (!in_array($resolved, $photos)) $photos[] = $resolved;
   }
 
-  return array_values(array_unique($photos));
+  return array_values(array_unique(array_filter($photos)));
 }
 ?>
 <style>
@@ -203,11 +212,14 @@ function getOrderPhotos(array $o): array {
       </div>
 
       <div class="order-meta">
+        <?php
+        $dispEmail = $o['epasts'] ?: ($o['viesis_epasts'] ?? '');
+        ?>
         <?php if ($o['vards']): ?>
         <strong><?= htmlspecialchars($o['vards'].' '.($o['uzvards']??'')) ?></strong>
-        <?php if ($o['epasts']): ?> · <a href="mailto:<?= htmlspecialchars($o['epasts']) ?>" style="color:var(--gold);"><?= htmlspecialchars($o['epasts']) ?></a><?php endif; ?>
+        <?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
         <?php else: ?>
-        <em style="color:var(--grey2);">Viesis</em>
+        <em style="color:var(--grey2);">Viesis</em><?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);font-style:normal;"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
         <?php endif; ?>
         <div style="margin-top:3px;">📅 <?= date('d.m.Y H:i', strtotime($o['izveidots'])) ?></div>
       </div>
@@ -296,18 +308,37 @@ function lxNav(d) { lxShow(lxCur + d); }
 
 // Download all photos for an order
 function downloadAll(photos, title) {
+  if (photos.length === 0) return;
   if (!confirm('Lejupielādēt visas ' + photos.length + ' fotogrāfijas?')) return;
-  photos.forEach((url, i) => {
-    setTimeout(() => {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'lumina_' + (title||'foto').replace(/[^a-z0-9]/gi,'_').toLowerCase() + '_' + (i+1) + '.jpg';
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }, i * 400);
-  });
+  // Create hidden iframe links for each photo to avoid popup blocker
+  const slug = (title||'foto').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  let i = 0;
+  function dlNext() {
+    if (i >= photos.length) return;
+    const url = photos[i];
+    const a = document.createElement('a');
+    // Force download via fetch blob to bypass same-origin issues
+    fetch(url)
+      .then(r => r.blob())
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        a.href = blobUrl;
+        a.download = 'lumina_' + slug + '_' + String(i+1).padStart(2,'0') + '.' + (url.split('.').pop().split('?')[0] || 'jpg');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        i++;
+        setTimeout(dlNext, 600);
+      })
+      .catch(() => {
+        // Fallback: open in new tab
+        window.open(url, '_blank');
+        i++;
+        setTimeout(dlNext, 300);
+      });
+  }
+  dlNext();
 }
 
 // Keyboard navigation

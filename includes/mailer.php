@@ -292,3 +292,19 @@ function mailFotoPasutijumsAdmin(string $vards, string $email, string $produkts,
     ' . emailBtn(SITE_URL . '/admin/pasutijumi.php', 'Skatīt pasūtījumu');
   return luminaMail(MAIL_ADMIN, 'Admin', 'Jauns foto pasutijums — ' . $vards, $html);
 }
+
+// ── Galerija — viesa piekļuves kods ──────────────────────────────
+function mailGalerijaViesis(string $epasts, string $vards, string $galNosaukums, string $kods): bool {
+  $html = emailHeader('Jūsu galerija ir gatava! 📸')
+    . emailGreeting($vards)
+    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;">Jūsu fotosesija ir pabeigta un galerija ir gatava apskatei. Izmantojiet zemāk norādīto piekļuves kodu, lai skatītu savas fotogrāfijas.</p>'
+    . '<div style="text-align:center;margin:28px 0;">'
+    . '<div style="display:inline-block;background:#f8f6f1;border:2px solid #B8975A;padding:16px 32px;border-radius:4px;">'
+    . '<div style="font-size:11px;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Piekļuves kods</div>'
+    . '<div style="font-size:32px;font-weight:700;color:#1a1a1a;letter-spacing:6px;font-family:monospace;">' . htmlspecialchars($kods) . '</div>'
+    . '</div></div>'
+    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;text-align:center;">Galerija: <strong>' . htmlspecialchars($galNosaukums) . '</strong></p>'
+    . emailBtn(SITE_URL . '/galerija-viesis.php', 'Skatīt galeriju →')
+    . '<p style="color:#999;font-size:11px;text-align:center;margin-top:20px;">Ja nākotnē izveidosiet kontu ar šo e-pasta adresi, galerija tiks automātiski piesaistīta jūsu profilam.</p>';
+  return luminaMail($epasts, $vards, 'Jūsu LUMINA galerija ir gatava — ' . $galNosaukums, $html);
+}

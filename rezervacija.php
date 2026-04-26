@@ -29,29 +29,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (empty($pakalpojums) || empty($datums)) {
     $error = 'Lūdzu aizpildiet visus obligātos laukus.';
   } else {
-    $sql = "INSERT INTO rezervacijas (klienta_id, pakalpojums, datums, laiks, vieta, papildu_info, statuss, cena) VALUES (?, ?, ?, ?, ?, ?, 'apstiprinats', ?)";
-    $stmt = mysqli_prepare($savienojums, $sql);
-    mysqli_stmt_bind_param($stmt, 'isssssd', $klienta_id, $pakalpojums, $datums, $laiks, $vieta, $papildu, $cena);
-    if (mysqli_stmt_execute($stmt)) {
+    // Collect guest/client contact info
+    $klientaVards = isset($_SESSION['klients_vards'])
+      ? $_SESSION['klients_vards']
+      : trim($_POST['vards'] ?? 'Viesis');
+    $klientaEmail = isset($_SESSION['klients_epasts'])
+      ? $_SESSION['klients_epasts']
+      : trim($_POST['epasts'] ?? '');
+    $talrunis = '';
+    if (isset($_SESSION['klients_id'])) {
+      $kl = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT talrunis FROM klienti WHERE id=" . (int)$_SESSION['klients_id']));
+      $talrunis = $kl['talrunis'] ?? '';
+    } else {
+      $talrunis = trim($_POST['talrunis'] ?? '');
+    }
+
+    // Save guest contact fields too
+    $vVards   = escape($savienojums, $klientaVards);
+    $vEpasts  = escape($savienojums, $klientaEmail);
+    $vTalr    = escape($savienojums, $talrunis);
+
+    $kidSql = $klienta_id ? $klienta_id : 'NULL';
+    $cenaSql = $cena !== null ? (float)$cena : 'NULL';
+    $sql = "INSERT INTO rezervacijas (klienta_id, pakalpojums, datums, laiks, vieta, papildu_info, statuss, cena, viesis_vards, viesis_epasts, viesis_talrunis)
+            VALUES ($kidSql, '$pakalpojums', '$datums', '$laiks', '$vieta', '$papildu', 'gaida', $cenaSql, '$vVards', '$vEpasts', '$vTalr')";
+    if (mysqli_query($savienojums, $sql)) {
       $success = 'Pieteikums nosūtīts! Apstiprinājums nosūtīts uz jūsu e-pastu.';
-      // Use session data if logged in, otherwise fall back to form fields (guests)
-      $klientaVards = isset($_SESSION['klients_vards'])
-        ? $_SESSION['klients_vards']
-        : escape($savienojums, trim($_POST['vards'] ?? 'Viesis'));
-      $klientaEmail = isset($_SESSION['klients_epasts'])
-        ? $_SESSION['klients_epasts']
-        : escape($savienojums, trim($_POST['epasts'] ?? ''));
-      // Also get talrunis from form for guests
-      if (!isset($_SESSION['klients_id'])) {
-        $talrunis = escape($savienojums, trim($_POST['talrunis'] ?? ''));
-      }
-      // Fetch client phone (logged-in) or keep form value (guest)
-      if (isset($_SESSION['klients_id'])) {
-        $kl = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT talrunis FROM klienti WHERE id=" . (int)$_SESSION['klients_id']));
-        $talrunis = $kl['talrunis'] ?? '';
-      }
       $rezData = ['pakalpojums'=>$pakalpojums,'datums'=>$datums,'laiks'=>$laiks,'vieta'=>$vieta,'cena'=>$cena,'papildu_info'=>$papildu];
-      try { require_once __DIR__ . '/includes/mailer.php'; mailRezervacijaAdmin($rezData, $klientaVards, $klientaEmail, $talrunis); if ($klientaEmail) mailRezervacijaKlients($klientaEmail, $klientaVards, $rezData); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
+      try {
+        require_once __DIR__ . '/includes/mailer.php';
+        mailRezervacijaAdmin($rezData, $klientaVards, $klientaEmail, $talrunis);
+        if ($klientaEmail) mailRezervacijaKlients($klientaEmail, $klientaVards, $rezData);
+      } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
     } else {
       $error = 'Kļūda: ' . mysqli_error($savienojums);
     }

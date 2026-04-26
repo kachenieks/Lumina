@@ -1,5 +1,9 @@
 <?php
 ob_start(); // Buffer output — prevents PHP errors/warnings from breaking HTML
+// Runtime limits (ini_set only works if PHP is not CGI/FPM with open_basedir)
+@ini_set('memory_limit', '256M');
+@ini_set('max_execution_time', '120');
+@set_time_limit(120);
 session_name('lumina_klient');
 session_start();
 require_once __DIR__ . '/includes/db.php';
@@ -123,43 +127,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_order'])) {
     $guestEmail = filter_var($_POST['guest_email'] ?? '', FILTER_VALIDATE_EMAIL) ?: '';
   }
 
-  $fotoInfo = '';
+  $allFotoUrls = [];
+  $uploadDir   = __DIR__ . '/uploads/pasutijumi/';
+  if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
-  if (!empty($_FILES['foto']['name'])) {
-    $uploadDir = __DIR__ . '/uploads/pasutijumi/';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+  // Multiple files (fotos[])
+  if (!empty($_FILES['fotos']['name'][0])) {
+    foreach ($_FILES['fotos']['tmp_name'] as $k => $tmp) {
+      if (!$tmp || !is_uploaded_file($tmp)) continue;
+      $ext = strtolower(pathinfo($_FILES['fotos']['name'][$k], PATHINFO_EXTENSION));
+      if (!in_array($ext, ['jpg','jpeg','png','webp'])) continue;
+      $fname = 'f_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($tmp, $uploadDir . $fname)) {
+        $allFotoUrls[] = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $fname;
+      }
+    }
+  }
+  // Single file fallback (foto)
+  if (empty($allFotoUrls) && !empty($_FILES['foto']['tmp_name'])) {
     $ext = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
     if (in_array($ext, ['jpg','jpeg','png','webp'])) {
-      $filename = uniqid() . '.' . $ext;
-      if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $filename)) {
-        $fotoInfo = $filename;
-        @mysqli_query($savienojums, "INSERT INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$filename','$cropData','$notes','jauns',NOW())");
-        $uploadSuccess = 'Pasūtījums saņemts!';
-      } else {
-        $uploadError = 'Augšupielādes kļūda. Pārbaudiet mapes tiesības (chmod 755 uploads/pasutijumi/).';
+      $fname = 'f_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($_FILES['foto']['tmp_name'], $uploadDir . $fname)) {
+        $allFotoUrls[] = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $fname;
       }
-    } else { $uploadError = 'Atļautie formāti: JPG, PNG, WEBP.'; }
-  } elseif (!empty($galUrl)) {
-    $fotoInfo = $galUrl;
-    @mysqli_query($savienojums, "INSERT INTO pasutijumi (klienta_id,produkts,foto_fails,crop_data,papildu_info,statuss,izveidots) VALUES ($klienta_id,'$produkts','$galUrl','$cropData','$notes','jauns',NOW())");
-    $uploadSuccess = 'Pasūtījums saņemts!';
-  } else { $uploadError = 'Lūdzu pievienojiet fotogrāfiju.'; }
-
-  // E-pasta paziņojumi — tikai ja PHPMailer ir augšupielādēts
-  if ($uploadSuccess) {
-    $klientaVards = $_SESSION['klients_vards'] ?? 'Viesis';
-    $klientaEmail = $_SESSION['klients_epasts'] ?? $guestEmail;
-    $mailerPath = __DIR__ . '/includes/mailer.php';
-    $phpmailerOk = file_exists(__DIR__ . '/PHPMailer/src/PHPMailer.php');
-    if ($phpmailerOk && file_exists($mailerPath)) {
-      try {
-        require_once $mailerPath;
-        if (function_exists('mailFotoPasutijumsAdmin'))
-          mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $produkts, $notes, $fotoInfo);
-        if ($klientaEmail && function_exists('mailFotoPasutijumsKlients'))
-          mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $produkts, $notes);
-      } catch (\Throwable $e) { error_log('Mail error: ' . $e->getMessage()); }
     }
+  }
+  // Gallery URLs
+  if (empty($allFotoUrls) && !empty($galUrl)) {
+    $allFotoUrls[] = $galUrl;
+  }
+  // Gallery URLs JSON from editor
+  if (!empty($_POST['gallery_urls'])) {
+    $gals = json_decode($_POST['gallery_urls'], true) ?: [];
+    foreach ($gals as $u) if (filter_var($u, FILTER_VALIDATE_URL)) $allFotoUrls[] = $u;
+  }
+
+  if (empty($allFotoUrls)) {
+    $uploadError = 'Lūdzu pievienojiet fotogrāfiju.';
+  } else {
+    $firstFoto  = escape($savienojums, $allFotoUrls[0]);
+    $fotoUrlsJs = escape($savienojums, json_encode($allFotoUrls));
+    $vEmail     = escape($savienojums, $guestEmail);
+    @mysqli_query($savienojums,
+      "INSERT INTO pasutijumi (klienta_id, produkts, foto_fails, foto_urls, crop_data, papildu_info, viesis_epasts, statuss, izveidots)
+        VALUES ($klienta_id,'$produkts','$firstFoto','$fotoUrlsJs','$cropData','$notes','$vEmail','jauns',NOW())"
+    );
+    $uploadSuccess = 'Pasūtījums saņemts!';
+    $klientaVards  = $_SESSION['klients_vards'] ?? 'Viesis';
+    $klientaEmail  = $_SESSION['klients_epasts'] ?? $guestEmail;
+    try {
+      require_once __DIR__ . '/includes/mailer.php';
+      if (function_exists('mailFotoPasutijumsAdmin'))
+        mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $produkts, $notes, $allFotoUrls[0]);
+      if ($klientaEmail && function_exists('mailFotoPasutijumsKlients'))
+        mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $produkts, $notes);
+    } catch (\Throwable $e) { error_log('Mail error: ' . $e->getMessage()); }
   }
 }
 
@@ -912,47 +935,88 @@ function checkEditorReady() {
 function addPhotoToCart() {
   if (!editorProduct || editorPhotos.length < editorProduct.fotos) return;
   const btn = document.getElementById('orderBtn');
-  btn.textContent = 'Pievieno...'; btn.disabled = true;
+  const totalPhotos = editorPhotos.length;
+  btn.textContent = 'Augšupielādē ' + totalPhotos + ' foto...';
+  btn.disabled = true;
 
-  const fd = new FormData();
-  fd.append('add_photo_to_cart', '1');
-  fd.append('produkts', editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
-  fd.append('cena', editorProduct.price);
-  fd.append('notes', document.getElementById('orderNotes').value);
+  // Compress all local photos client-side before upload
+  // (avoids PHP upload_max_filesize issues on shared/school servers)
+  const localPhotos = editorPhotos.filter(p => !p.galleryUrl && p.src.startsWith('data:'));
+  const galUrls2    = editorPhotos.filter(p => p.galleryUrl).map(p => p.galleryUrl);
 
-  const galUrls = editorPhotos.filter(p => p.galleryUrl).map(p => p.galleryUrl);
-  if (galUrls.length) fd.append('gallery_urls', JSON.stringify(galUrls));
+  btn.textContent = localPhotos.length > 0
+    ? 'Saspiež ' + localPhotos.length + ' foto...'
+    : 'Pievieno...';
 
-  let fc = 0;
-  editorPhotos.filter(p => !p.galleryUrl && p.src.startsWith('data:')).forEach(p => {
-    fd.append('fotos[]', dataURLtoBlob(p.src), 'f'+(++fc)+'.jpg');
-  });
+  // Compress all photos in parallel then upload
+  Promise.all(localPhotos.map(function(p) {
+    return compressImage(p.src, 1600, 1600, 0.82);
+  })).then(function(compressed) {
+    const fd2 = new FormData();
+    fd2.append('add_photo_to_cart', '1');
+    fd2.append('produkts', editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
+    fd2.append('cena', editorProduct.price);
+    fd2.append('notes', document.getElementById('orderNotes').value);
+    if (galUrls2.length) fd2.append('gallery_urls', JSON.stringify(galUrls2));
 
-  fetch('/4pt/blazkova/lumina/Lumina/veikals.php', {method:'POST', body:fd})
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        document.getElementById('cartCount').textContent = data.count;
-        closeModal('photoEditorModal');
-        showToast(editorProduct.title + ' pievienots grozam ✓', 'success');
-        // Reset
-        editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0;
-        document.querySelectorAll('.gal-pick').forEach(el => {
-          el.style.borderColor='transparent';
-          el.querySelector('.gal-pick-check').style.display='none';
-        });
-        clearPreview();
-        document.getElementById('uploadedThumbs').innerHTML = '';
-        document.getElementById('orderNotes').value = '';
-        checkEditorReady(); updateEditorCount();
-      } else {
-        showToast(data.error || 'Kļūda', 'error');
-      }
-      btn.textContent = 'Pievienot grozam →'; btn.disabled = false;
-    }).catch(() => {
-      showToast('Savienojuma kļūda', 'error');
-      btn.textContent = 'Pievienot grozam →'; btn.disabled = false;
+    compressed.forEach(function(dataUrl, i) {
+      fd2.append('fotos[]', dataURLtoBlob(dataUrl), 'foto_' + (i+1) + '.jpg');
     });
+
+    btn.textContent = 'Augšupielādē...';
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/4pt/blazkova/lumina/Lumina/veikals.php');
+
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const pct = Math.round(e.loaded / e.total * 100);
+        btn.textContent = 'Augšupielādē... ' + pct + '%';
+      }
+    });
+
+    xhr.onload = function() {
+      let data;
+      try { data = JSON.parse(xhr.responseText); }
+      catch(e) { data = {ok: false, error: 'Servera kļūda'}; }
+      handleCartResponse(data);
+    };
+
+    xhr.onerror = function() {
+      btn.textContent = 'Pievienot grozam →';
+      btn.disabled = false;
+      showToast('Savienojuma kļūda. Mēģiniet vēlreiz.', 'error');
+    };
+
+    xhr.send(fd2);
+  });
+}
+
+function handleCartResponse(data) {
+  const btn = document.getElementById('orderBtn');
+  if (data.ok) {
+    document.getElementById('cartCount').textContent = data.count;
+    closeModal('photoEditorModal');
+    showToast((editorProduct ? editorProduct.title : 'Prece') + ' pievienots grozam ✓', 'success');
+    // Reset editor state
+    editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0;
+    document.querySelectorAll('.gal-pick').forEach(el => {
+      el.style.borderColor = 'transparent';
+      const chk = el.querySelector('.gal-pick-check');
+      if (chk) chk.style.display = 'none';
+    });
+    clearPreview();
+    const thumbs = document.getElementById('uploadedThumbs');
+    if (thumbs) thumbs.innerHTML = '';
+    const notes = document.getElementById('orderNotes');
+    if (notes) notes.value = '';
+    if (typeof checkEditorReady === 'function') checkEditorReady();
+    if (typeof updateEditorCount === 'function') updateEditorCount();
+  } else {
+    showToast(data.error || 'Kļūda, mēģiniet vēlreiz', 'error');
+  }
+  btn.textContent = 'Pievienot grozam →';
+  btn.disabled = false;
 }
 
 function dataURLtoBlob(d) {
@@ -960,6 +1024,30 @@ function dataURLtoBlob(d) {
   let n=b.length; const u=new Uint8Array(n);
   while(n--) u[n]=b.charCodeAt(n);
   return new Blob([u],{type:m});
+}
+
+// Compress image to max 1600px wide and JPEG 0.82 quality before upload
+// Reduces 5MB photo → ~300-500KB, making 30 photos fit in ~15MB (within default limits)
+function compressImage(dataUrl, maxW, maxH, quality) {
+  maxW = maxW || 1600; maxH = maxH || 1600; quality = quality || 0.82;
+  return new Promise(function(resolve) {
+    const img = new Image();
+    img.onload = function() {
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW/w, maxH/h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function() { resolve(dataUrl); }; // fallback: original
+    img.src = dataUrl;
+  });
 }
 
 // ── DRAG & TOUCH ──────────────────────────────────────

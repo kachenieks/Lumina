@@ -168,16 +168,24 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
       $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
       $photos = [];
       if (!empty($p['foto_urls'])) {
-        $arr = json_decode($p['foto_urls'], true) ?: [];
-        foreach ($arr as $u) {
-          if (trim($u) === '') continue;
-          $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+        $raw = $p['foto_urls'];
+        $arr = json_decode($raw, true);
+        if (is_array($arr)) {
+          foreach ($arr as $u) {
+            $u = trim($u); if ($u === '') continue;
+            $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+          }
+        } else {
+          $u = trim($raw);
+          if ($u !== '') $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
         }
       }
-      if (empty($photos) && !empty($p['foto_fails'])) {
-        $photos[] = filter_var($p['foto_fails'], FILTER_VALIDATE_URL) ? $p['foto_fails'] : $base . $p['foto_fails'];
+      if (!empty($p['foto_fails'])) {
+        $u = trim($p['foto_fails']);
+        $res = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
+        if (!in_array($res, $photos)) $photos[] = $res;
       }
-      return array_values(array_unique($photos));
+      return array_values(array_unique(array_filter($photos)));
     }
     ?>
     <style>

@@ -49,6 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['klients_id']    = $id;
         $_SESSION['klients_vards'] = $vards;
         $_SESSION['klients_epasts']= $epasts;
+        // Link guest galleries / reservations / orders with this email to new account
+        $epEsc = escape($savienojums, $epasts);
+        @mysqli_query($savienojums, "UPDATE galerijas SET klienta_id=$id WHERE viesis_epasts='$epEsc' AND klienta_id=0");
+        @mysqli_query($savienojums, "UPDATE rezervacijas SET klienta_id=$id WHERE viesis_epasts='$epEsc' AND (klienta_id IS NULL OR klienta_id=0)");
+        @mysqli_query($savienojums, "UPDATE pasutijumi SET klienta_id=$id WHERE viesis_epasts='$epEsc' AND (klienta_id IS NULL OR klienta_id=0)");
         // E-pasta apstiprinājums
         try { require_once __DIR__ . '/includes/mailer.php'; mailRegistracija($epasts, $vards); } catch(\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
         header('Location: /4pt/blazkova/lumina/Lumina/profils.php');
