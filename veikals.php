@@ -104,6 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart']))
     'notes'      => $notes,
     'guest_email'=> $guestEmail,
   ];
+  // Save guest email to session so stripe_checkout can use it
+  if ($guestEmail && !isset($_SESSION['klients_epasts'])) {
+    $_SESSION['viesis_epasts_tmp'] = $guestEmail;
+  }
 
   echo json_encode([
     'ok'    => true,
@@ -492,6 +496,12 @@ if (isset($_SESSION['klients_id'])) {
           <div class="editor-step-num" id="notesStepNum">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
           <textarea id="orderNotes" class="form-textarea" style="height:65px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
+          <?php if (!isset($_SESSION['klients_id'])): ?>
+          <div style="margin-top:10px;">
+            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam)</label>
+            <input type="email" id="guestEmailField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="jusu@epasts.lv">
+          </div>
+          <?php endif; ?>
           <div style="margin-top:10px;padding:11px;background:var(--cream2);">
             <div style="font-size:9px;color:var(--grey);text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;">Kopsavilkums</div>
             <div id="summaryProduct" style="font-size:12px;color:var(--ink);margin-bottom:3px;">—</div>
@@ -957,6 +967,11 @@ function addPhotoToCart() {
     fd2.append('produkts', editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
     fd2.append('cena', editorProduct.price);
     fd2.append('notes', document.getElementById('orderNotes').value);
+    // Send guest email if not logged in
+    const guestEmailEl = document.getElementById('guestEmailField');
+    if (guestEmailEl && guestEmailEl.value.trim()) {
+      fd2.append('guest_email', guestEmailEl.value.trim());
+    }
     if (galUrls2.length) fd2.append('gallery_urls', JSON.stringify(galUrls2));
 
     compressed.forEach(function(dataUrl, i) {

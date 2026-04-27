@@ -119,7 +119,7 @@ if ($action === 'success') {
   if (!empty($orderId) && !empty($_SESSION['cart'])) {
     $klientsId    = (int)($_SESSION['klients_id'] ?? 0);
     $klientaVards = $_SESSION['klients_vards'] ?? 'Klients';
-    $klientaEmail = $_SESSION['klients_epasts'] ?? '';
+    $klientaEmail = $_SESSION['klients_epasts'] ?? $_SESSION['viesis_epasts_tmp'] ?? '';
 
     // Ja viesis — iegūst e-pastu no Stripe session
     if (empty($klientaEmail) && !empty($sessionId) && strpos(STRIPE_KEY, 'IEVIETO') === false) {
@@ -168,12 +168,24 @@ if ($action === 'success') {
       @mysqli_query($savienojums, "UPDATE klienti SET kopeja_summa = kopeja_summa + $total WHERE id=$klientsId");
     }
 
-    // Send emails
+    // Send emails — use foto template if cart has foto items
     try {
       require_once __DIR__ . '/includes/mailer.php';
-      if ($klientaEmail) mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
-      mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+      $hasFoto = !empty(array_filter($items, fn($i) => !empty($i['is_foto'])));
+      if ($hasFoto) {
+        foreach ($items as $itm) {
+          if (!empty($itm['is_foto']) && $klientaEmail && function_exists('mailFotoPasutijumsKlients'))
+            mailFotoPasutijumsKlients($klientaEmail, $klientaVards, $itm['name'], $itm['notes'] ?? '');
+        }
+        $fi = array_values(array_filter($items, fn($i) => !empty($i['is_foto'])))[0];
+        if (function_exists('mailFotoPasutijumsAdmin'))
+          mailFotoPasutijumsAdmin($klientaVards, $klientaEmail, $fi['name'], $fi['notes'] ?? '', $fi['foto_url'] ?? '');
+      } else {
+        if ($klientaEmail) mailPasutijumsKlients($klientaEmail, $klientaVards, $items, $total, $orderId);
+        mailPasutijumsAdmin($klientaVards, $klientaEmail, $items, $total, $orderId);
+      }
     } catch (\Throwable $e) { error_log('Stripe mail error: ' . $e->getMessage()); }
+    unset($_SESSION['viesis_epasts_tmp']);
 
     $_SESSION['cart'] = [];
     unset($_SESSION['pending_order_id']);

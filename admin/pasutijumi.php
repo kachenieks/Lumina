@@ -5,353 +5,272 @@ require_once __DIR__ . '/../includes/db.php';
 if (!isset($_SESSION['admin_auth'])) { header('Location: /4pt/blazkova/lumina/Lumina/admin/login.php'); exit; }
 $pageTitle = 'Foto pasūtījumi';
 
+function escape2($db, $s) { return mysqli_real_escape_string($db, $s); }
+
 // Status update
 if (isset($_GET['status'], $_GET['id'])) {
-  $id = (int)$_GET['id'];
+  $id     = (int)$_GET['id'];
   $status = in_array($_GET['status'], ['jauns','apstiprinats','pabeigts','atcelts']) ? $_GET['status'] : 'jauns';
   mysqli_query($savienojums, "UPDATE pasutijumi SET statuss='$status' WHERE id=$id");
-  header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=updated'); exit;
+  $f = isset($_GET['filter']) ? '&filter='.urlencode($_GET['filter']) : '';
+  header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=updated'.$f); exit;
 }
 
 // Delete
 if (isset($_GET['delete'])) {
-  $id = (int)$_GET['delete'];
+  $id  = (int)$_GET['delete'];
   $row = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT foto_fails, foto_urls FROM pasutijumi WHERE id=$id"));
   if ($row) {
-    if ($row['foto_fails'] && !filter_var($row['foto_fails'], FILTER_VALIDATE_URL)) {
-      @unlink(__DIR__ . '/../uploads/pasutijumi/' . $row['foto_fails']);
-    }
+    $base = __DIR__ . '/../uploads/pasutijumi/';
+    if ($row['foto_fails'] && !filter_var($row['foto_fails'], FILTER_VALIDATE_URL))
+      @unlink($base . $row['foto_fails']);
     if ($row['foto_urls']) {
-      $urls = json_decode($row['foto_urls'], true) ?: [];
-      foreach ($urls as $u) {
-        if (!filter_var($u, FILTER_VALIDATE_URL)) @unlink(__DIR__ . '/../uploads/pasutijumi/' . basename($u));
-      }
+      $arr = json_decode($row['foto_urls'], true) ?: [];
+      foreach ($arr as $u)
+        if (!filter_var($u, FILTER_VALIDATE_URL)) @unlink($base . basename($u));
     }
   }
   mysqli_query($savienojums, "DELETE FROM pasutijumi WHERE id=$id");
-  header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=deleted'); exit;
+  $f = isset($_GET['filter']) ? '&filter='.urlencode($_GET['filter']) : '';
+  header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=deleted'.$f); exit;
 }
 
-// Fetch all orders with client info
+// Fetch orders
 $filter = $_GET['filter'] ?? '';
-$where = $filter ? "WHERE p.statuss='".escape($savienojums,$filter)."'" : '';
+$where  = $filter ? "WHERE p.statuss='".escape2($savienojums,$filter)."'" : '';
 $orders = [];
 $res = mysqli_query($savienojums,
-  "SELECT p.*, k.vards, k.uzvards, k.epasts, p.viesis_epasts
+  "SELECT p.*, k.vards, k.uzvards, k.epasts
    FROM pasutijumi p
-   LEFT JOIN klienti k ON p.klienta_id = k.id
+   LEFT JOIN klienti k ON p.klienta_id = k.id AND p.klienta_id > 0
    $where
    ORDER BY p.izveidots DESC"
 );
 while ($r = mysqli_fetch_assoc($res)) $orders[] = $r;
 
-include __DIR__ . '/includes/header.php';
-
-// Helper: build all photo URLs for an order
-function getOrderPhotos(array $o): array {
+// Build photo URL list for one order
+function orderPhotos(array $o): array {
   $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
-  $photos = [];
-
-  // foto_urls — can be JSON array OR a single URL string
+  $out  = [];
   if (!empty($o['foto_urls'])) {
-    $raw = $o['foto_urls'];
-    // Try JSON array first
-    $arr = json_decode($raw, true);
+    $arr = json_decode($o['foto_urls'], true);
     if (is_array($arr)) {
       foreach ($arr as $u) {
-        $u = trim($u);
-        if ($u === '') continue;
-        $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+        $u = trim($u); if (!$u) continue;
+        $out[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
       }
     } else {
-      // Plain URL string
-      $u = trim($raw);
-      if ($u !== '') $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+      $u = trim($o['foto_urls']);
+      if ($u) $out[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
     }
   }
-
-  // Single foto_fails (non-album or fallback)
   if (!empty($o['foto_fails'])) {
-    $u = trim($o['foto_fails']);
-    $resolved = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
-    if (!in_array($resolved, $photos)) $photos[] = $resolved;
+    $u  = trim($o['foto_fails']);
+    $r2 = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
+    if (!in_array($r2, $out)) $out[] = $r2;
   }
-
-  return array_values(array_unique(array_filter($photos)));
+  return array_values(array_unique(array_filter($out)));
 }
+
+include __DIR__ . '/includes/header.php';
 ?>
 <style>
-.order-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:22px; }
-.order-card { background:var(--white); border:1px solid var(--grey3); overflow:hidden; transition:.2s; }
-.order-card:hover { box-shadow:0 4px 24px rgba(0,0,0,.1); }
-.order-body { padding:18px 20px; }
-.order-product { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--ink); margin-bottom:4px; }
-.order-meta { font-size:11px; color:var(--grey2); margin-bottom:10px; }
-.order-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid var(--grey3); }
-.sp { display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase; }
-.sp-jauns{background:#fff3e0;color:#e65100;}.sp-apstiprinats{background:#e8f5e9;color:#2e7d32;}
-.sp-pabeigts{background:#e3f2fd;color:#1565c0;}.sp-atcelts{background:#fce4ec;color:#c62828;}.sp-apmaksats{background:#f3e5f5;color:#6a1b9a;}
-
-/* Photo strip */
-.photo-strip { display:flex; gap:3px; overflow-x:auto; padding:3px; background:var(--cream2); }
-.photo-strip::-webkit-scrollbar { height:4px; }
-.photo-strip::-webkit-scrollbar-thumb { background:var(--grey3); }
-.photo-strip-thumb { width:72px; height:72px; object-fit:cover; flex-shrink:0; cursor:pointer;
-  border:2px solid transparent; transition:.15s; border-radius:2px; }
-.photo-strip-thumb:hover { border-color:var(--gold); transform:scale(1.04); }
-.photo-strip-thumb.active { border-color:var(--gold); }
-.photo-count-badge { font-size:10px; color:var(--grey); padding:4px 8px; background:var(--cream2);
-  border-bottom:1px solid var(--grey3); display:flex; justify-content:space-between; align-items:center; }
-
+.og { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px; }
+.oc { background:var(--white); border:1px solid var(--grey3); overflow:hidden; transition:box-shadow .2s; }
+.oc:hover { box-shadow:0 4px 20px rgba(0,0,0,.1); }
+.ob { padding:16px 18px; }
+.op { font-family:'Cormorant Garamond',serif; font-size:19px; color:var(--ink); margin-bottom:4px; }
+.om { font-size:11px; color:var(--grey2); margin-bottom:10px; }
+.oa { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px solid var(--grey3); }
+.sbadge { display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase; }
+.s-jauns{background:#fff3e0;color:#e65100}.s-apstiprinats{background:#e8f5e9;color:#2e7d32}
+.s-pabeigts{background:#e3f2fd;color:#1565c0}.s-atcelts{background:#fce4ec;color:#c62828}.s-apmaksats{background:#f3e5f5;color:#6a1b9a}
+.strip { display:flex; gap:2px; overflow-x:auto; padding:2px; background:var(--cream2); }
+.strip img { width:66px;height:66px;object-fit:cover;flex-shrink:0;cursor:pointer;border:2px solid transparent;transition:.15s;border-radius:1px; }
+.strip img:hover { border-color:var(--gold); }
+.pcb { font-size:10px;color:var(--grey);padding:3px 8px;background:var(--cream2);border-bottom:1px solid var(--grey3);display:flex;justify-content:space-between;align-items:center; }
 /* Lightbox */
-#lx { display:none; position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:9999;
-  align-items:center; justify-content:center; flex-direction:column; }
-#lx.open { display:flex; }
-#lx-img { max-width:88vw; max-height:80vh; object-fit:contain; border:1px solid rgba(255,255,255,.1); }
-#lx-strip { display:flex; gap:6px; margin-top:14px; overflow-x:auto; max-width:88vw; padding-bottom:4px; }
-#lx-strip img { width:60px; height:60px; object-fit:cover; cursor:pointer; opacity:.5;
-  border:2px solid transparent; transition:.15s; flex-shrink:0; }
-#lx-strip img.active { opacity:1; border-color:var(--gold,#B8975A); }
-#lx-info { color:rgba(255,255,255,.6); font-size:12px; margin-top:10px; letter-spacing:1px; }
-#lx-nav { display:flex; gap:16px; margin-top:16px; }
-#lx-nav button { background:none; border:1px solid rgba(255,255,255,.3); color:#fff; padding:8px 22px;
-  cursor:pointer; font-size:18px; transition:.15s; }
-#lx-nav button:hover { background:var(--gold,#B8975A); border-color:var(--gold,#B8975A); }
-#lx-close { position:absolute; top:20px; right:24px; background:none; border:none; color:#fff;
-  font-size:28px; cursor:pointer; opacity:.7; transition:.15s; }
-#lx-close:hover { opacity:1; }
-#lx-download { display:inline-block; margin-top:10px; padding:8px 22px; background:var(--gold,#B8975A);
-  color:#fff; font-size:11px; letter-spacing:2px; text-transform:uppercase; text-decoration:none;
-  transition:.15s; border:none; cursor:pointer; }
-#lx-download:hover { background:#9a7d48; }
-#lx-dl-all { display:inline-block; margin-top:10px; margin-left:8px; padding:8px 22px;
-  background:transparent; border:1px solid rgba(255,255,255,.4); color:#fff; font-size:11px;
-  letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:.15s; }
-#lx-dl-all:hover { background:rgba(255,255,255,.1); }
+#admlx{display:none;position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:9999;flex-direction:column;align-items:center;justify-content:center;}
+#admlx.open{display:flex;}
+#admlx-img{max-width:88vw;max-height:78vh;object-fit:contain;}
+#admlx-strip{display:flex;gap:5px;margin-top:12px;overflow-x:auto;max-width:88vw;padding-bottom:4px;}
+#admlx-strip img{width:58px;height:58px;object-fit:cover;cursor:pointer;opacity:.45;border:2px solid transparent;transition:.15s;flex-shrink:0;}
+#admlx-strip img.on{opacity:1;border-color:#B8975A;}
+#admlx-info{color:rgba(255,255,255,.45);font-size:11px;margin-top:8px;letter-spacing:1px;}
+#admlx-close{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;}
+#admlx-btns{display:flex;gap:10px;margin-top:14px;}
+.lx-nav{background:none;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 20px;cursor:pointer;font-size:18px;transition:.15s;}
+.lx-nav:hover{background:#B8975A;border-color:#B8975A;}
+.lx-dl{padding:8px 20px;background:#B8975A;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;}
 </style>
 
 <?php if (isset($_GET['msg'])): ?>
-<div class="alert alert-success" style="margin-bottom:20px;">
-  <?= $_GET['msg']==='updated' ? 'Statuss atjaunināts.' : 'Pasūtījums dzēsts.' ?>
+<div class="alert alert-success" style="margin-bottom:18px;">
+  <?= $_GET['msg']==='deleted' ? 'Pasūtījums dzēsts.' : 'Statuss atjaunināts.' ?>
 </div>
 <?php endif; ?>
 
 <div class="section-header">
   <div class="section-heading">Foto pasūtījumi</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <?php
-    $filters = [''=> 'Visi', 'jauns'=>'Jauni', 'apstiprinats'=>'Apstiprināti', 'pabeigts'=>'Pabeigti', 'atcelts'=>'Atcelti', 'apmaksats'=>'Apmaksāti'];
-    foreach ($filters as $f => $lbl):
-    ?>
-    <a href="?filter=<?= $f ?>" class="action-btn <?= $filter===$f?'success':'' ?>"><?= $lbl ?></a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <?php foreach ([''=> 'Visi','jauns'=>'Jauni','apstiprinats'=>'Apstiprināti','pabeigts'=>'Pabeigti','atcelts'=>'Atcelti','apmaksats'=>'Apmaksāti'] as $f=>$lbl): ?>
+    <a href="?filter=<?= urlencode($f) ?>" class="action-btn <?= $filter===$f?'success':'' ?>"><?= $lbl ?></a>
     <?php endforeach; ?>
   </div>
 </div>
 
 <?php if (empty($orders)): ?>
 <div style="text-align:center;padding:60px;color:var(--grey2);">
-  <div style="font-size:48px;opacity:.2;margin-bottom:16px;">🖼️</div>
-  <p>Nav pasūtījumu.</p>
+  <div style="font-size:48px;opacity:.2;margin-bottom:12px;">🖼️</div><p>Nav pasūtījumu.</p>
 </div>
 <?php else: ?>
-<div class="order-grid">
-  <?php foreach ($orders as $o):
-    $sl = $o['statuss'] ?? 'jauns';
-    $photos = getOrderPhotos($o);
-    $photoCount = count($photos);
-    $orderId = $o['id'];
-    $photosJson = json_encode($photos);
-  ?>
-  <div class="order-card">
-
-    <?php if ($photoCount > 0): ?>
-    <!-- Photo count badge -->
-    <div class="photo-count-badge">
-      <span><?= $photoCount ?> foto · <span id="idx-<?= $orderId ?>">1 / <?= $photoCount ?></span></span>
-      <button onclick="openLightbox(<?= $photosJson ?>, 0, '<?= htmlspecialchars(addslashes($o['produkts'])) ?>')"
-        style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:0;">
-        Aplūkot visas →
-      </button>
-    </div>
-
-    <!-- Main preview (first photo, clickable) -->
-    <div style="position:relative;cursor:pointer;" onclick="openLightbox(<?= $photosJson ?>, 0, '<?= htmlspecialchars(addslashes($o['produkts'])) ?>')">
-      <img src="<?= htmlspecialchars($photos[0]) ?>" alt=""
-        style="width:100%;height:220px;object-fit:cover;display:block;"
-        onerror="this.parentNode.innerHTML='<div style=\'height:220px;display:flex;align-items:center;justify-content:center;background:var(--cream2);font-size:48px;opacity:.2;\'>🖼️</div>'">
-      <?php if ($photoCount > 1): ?>
-      <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 8px;border-radius:12px;letter-spacing:.5px;">
-        +<?= $photoCount-1 ?> vēl
-      </div>
-      <?php endif; ?>
-      <div style="position:absolute;inset:0;background:rgba(0,0,0,0);transition:.2s;"
-        onmouseover="this.style.background='rgba(0,0,0,.15)'"
-        onmouseout="this.style.background='rgba(0,0,0,0)'">
-      </div>
-    </div>
-
-    <?php if ($photoCount > 1): ?>
-    <!-- Thumbnail strip -->
-    <div class="photo-strip" id="strip-<?= $orderId ?>">
-      <?php foreach ($photos as $i => $ph): ?>
-      <img src="<?= htmlspecialchars($ph) ?>" class="photo-strip-thumb <?= $i===0?'active':'' ?>"
-        onclick="openLightbox(<?= $photosJson ?>, <?= $i ?>, '<?= htmlspecialchars(addslashes($o['produkts'])) ?>')"
-        onerror="this.style.display='none'">
-      <?php endforeach; ?>
-    </div>
+<div class="og">
+<?php foreach ($orders as $o):
+  $sl     = $o['statuss'] ?? 'jauns';
+  $photos = orderPhotos($o);
+  $pc     = count($photos);
+  $flt    = urlencode($filter);
+  $oid    = (int)$o['id'];
+  // Safe JSON for data attribute
+  $photosData = htmlspecialchars(json_encode($photos, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES);
+  $titleData  = htmlspecialchars($o['produkts'] ?? '', ENT_QUOTES);
+  $dispEmail  = $o['epasts'] ?: ($o['viesis_epasts'] ?? '');
+?>
+<div class="oc">
+  <?php if ($pc > 0): ?>
+  <div class="pcb">
+    <span><?= $pc ?> foto</span>
+    <button data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
+      onclick="admLxOpen(JSON.parse(this.dataset.photos), 0, this.dataset.title)"
+      style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:0;">
+      Aplūkot visas →
+    </button>
+  </div>
+  <!-- Main photo -->
+  <div style="position:relative;cursor:pointer;"
+    data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
+    onclick="admLxOpen(JSON.parse(this.dataset.photos), 0, this.dataset.title)">
+    <img src="<?= htmlspecialchars($photos[0]) ?>" alt=""
+      style="width:100%;height:200px;object-fit:cover;display:block;"
+      onerror="this.style.display='none'">
+    <?php if ($pc > 1): ?>
+    <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">+<?= $pc-1 ?> vēl</div>
     <?php endif; ?>
+  </div>
+  <?php if ($pc > 1): ?>
+  <div class="strip">
+    <?php foreach ($photos as $i => $ph): ?>
+    <img src="<?= htmlspecialchars($ph) ?>" alt=""
+      data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
+      onclick="admLxOpen(JSON.parse(this.dataset.photos), <?= $i ?>, this.dataset.title)"
+      onerror="this.style.display='none'">
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+  <?php else: ?>
+  <div style="height:160px;display:flex;align-items:center;justify-content:center;background:var(--cream2);font-size:44px;opacity:.18;">🖼️</div>
+  <?php endif; ?>
 
-    <?php else: ?>
-    <div style="height:180px;display:flex;align-items:center;justify-content:center;background:var(--cream2);font-size:48px;opacity:.18;">🖼️</div>
-    <?php endif; ?>
-
-    <div class="order-body">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-        <div class="order-product"><?= htmlspecialchars($o['produkts']) ?></div>
-        <span class="sp sp-<?= $sl ?>"><?= ucfirst($sl) ?></span>
-      </div>
-
-      <div class="order-meta">
-        <?php
-        $dispEmail = $o['epasts'] ?: ($o['viesis_epasts'] ?? '');
-        ?>
-        <?php if ($o['vards']): ?>
+  <div class="ob">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+      <div class="op"><?= htmlspecialchars($o['produkts'] ?? '') ?></div>
+      <span class="sbadge s-<?= $sl ?>"><?= ucfirst($sl) ?></span>
+    </div>
+    <div class="om">
+      <?php if ($o['vards']): ?>
         <strong><?= htmlspecialchars($o['vards'].' '.($o['uzvards']??'')) ?></strong>
         <?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
-        <?php else: ?>
-        <em style="color:var(--grey2);">Viesis</em><?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);font-style:normal;"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
-        <?php endif; ?>
-        <div style="margin-top:3px;">📅 <?= date('d.m.Y H:i', strtotime($o['izveidots'])) ?></div>
-      </div>
-
-      <?php if (!empty($o['papildu_info'])): ?>
-      <div style="font-size:12px;color:var(--grey);background:var(--cream);padding:8px 12px;border-left:2px solid var(--gold);margin-bottom:8px;">
-        💬 <?= htmlspecialchars($o['papildu_info']) ?>
-      </div>
+      <?php else: ?>
+        <em>Viesis</em><?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);font-style:normal;"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
       <?php endif; ?>
-
-      <div class="order-actions">
-        <?php if ($photoCount > 0): ?>
-        <button onclick="downloadAll(<?= $photosJson ?>, '<?= addslashes($o['produkts']) ?>')"
-          class="action-btn" style="cursor:pointer;">
-          ⬇ Lejupielādēt (<?= $photoCount ?>)
-        </button>
-        <?php endif; ?>
-        <?php if ($sl === 'jauns' || $sl === 'apmaksats'): ?>
-        <a href="?status=apstiprinats&id=<?= $o['id'] ?>" class="action-btn success"
-           onclick="return confirm('Apstiprināt pasūtījumu?')">✓ Apstiprināt</a>
-        <?php endif; ?>
-        <?php if ($sl !== 'pabeigts' && $sl !== 'atcelts'): ?>
-        <a href="?status=pabeigts&id=<?= $o['id'] ?>" class="action-btn"
-           onclick="return confirm('Atzīmēt kā pabeigtu?')">✔ Pabeigts</a>
-        <?php endif; ?>
-        <?php if ($sl !== 'atcelts'): ?>
-        <a href="?status=atcelts&id=<?= $o['id'] ?>" class="action-btn danger"
-           onclick="return confirm('Atcelt pasūtījumu?')">✕ Atcelt</a>
-        <?php endif; ?>
-        <a href="?delete=<?= $o['id'] ?>" class="action-btn danger"
-           onclick="return confirm('Dzēst pasūtījumu #<?= $o['id'] ?>?')">🗑</a>
-      </div>
+      <div style="margin-top:2px;">📅 <?= date('d.m.Y H:i', strtotime($o['izveidots'])) ?></div>
+    </div>
+    <?php if (!empty($o['papildu_info'])): ?>
+    <div style="font-size:12px;color:var(--grey);background:var(--cream);padding:7px 10px;border-left:2px solid var(--gold);margin-bottom:8px;">
+      <?= htmlspecialchars($o['papildu_info']) ?>
+    </div>
+    <?php endif; ?>
+    <div class="oa">
+      <?php if ($pc > 0): ?>
+      <button data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
+        onclick="admDlAll(JSON.parse(this.dataset.photos), this.dataset.title)"
+        class="action-btn" style="cursor:pointer;">⬇ Lejupielādēt (<?= $pc ?>)</button>
+      <?php endif; ?>
+      <?php if (in_array($sl, ['jauns','apmaksats'])): ?>
+      <a href="?status=apstiprinats&id=<?= $oid ?>&filter=<?= $flt ?>"
+         onclick="return confirm('Apstiprināt?')" class="action-btn success">✓ Apstiprināt</a>
+      <?php endif; ?>
+      <?php if (!in_array($sl, ['pabeigts','atcelts'])): ?>
+      <a href="?status=pabeigts&id=<?= $oid ?>&filter=<?= $flt ?>"
+         onclick="return confirm('Atzīmēt kā pabeigtu?')" class="action-btn">✔ Pabeigts</a>
+      <?php endif; ?>
+      <?php if ($sl !== 'atcelts'): ?>
+      <a href="?status=atcelts&id=<?= $oid ?>&filter=<?= $flt ?>"
+         onclick="return confirm('Atcelt pasūtījumu?')" class="action-btn danger">✕ Atcelt</a>
+      <?php endif; ?>
+      <a href="?delete=<?= $oid ?>&filter=<?= $flt ?>"
+         onclick="return confirm('Dzēst #<?= $oid ?>?')" class="action-btn danger">🗑</a>
     </div>
   </div>
-  <?php endforeach; ?>
+</div>
+<?php endforeach; ?>
 </div>
 <?php endif; ?>
 
 <!-- Lightbox -->
-<div id="lx">
-  <button id="lx-close" onclick="closeLightbox()">✕</button>
-  <img id="lx-img" src="" alt="">
-  <div id="lx-strip"></div>
-  <div id="lx-info"></div>
-  <div id="lx-nav">
-    <button onclick="lxNav(-1)">‹</button>
-    <a id="lx-download" href="#" download>⬇ Lejupielādēt</a>
-    <button onclick="lxNav(1)">›</button>
+<div id="admlx" onclick="if(event.target===this)admLxClose()">
+  <button id="admlx-close" onclick="admLxClose()">✕</button>
+  <img id="admlx-img" src="" alt="">
+  <div id="admlx-strip"></div>
+  <div id="admlx-info"></div>
+  <div id="admlx-btns">
+    <button class="lx-nav" onclick="admLxNav(-1)">‹</button>
+    <a class="lx-dl" id="admlx-dl" href="#" download>⬇ Lejupielādēt</a>
+    <button class="lx-nav" onclick="admLxNav(1)">›</button>
   </div>
 </div>
 
 <script>
-let lxPhotos = [], lxCur = 0, lxTitle = '';
-
-function openLightbox(photos, idx, title) {
-  lxPhotos = photos; lxCur = idx; lxTitle = title;
-  document.getElementById('lx').classList.add('open');
-  document.body.style.overflow = 'hidden';
-  lxShow(idx);
+var _AP=[], _AC=0, _AT='';
+function admLxOpen(p,i,t){ _AP=p; _AT=t; document.getElementById('admlx').classList.add('open'); document.body.style.overflow='hidden'; admLxShow(i); }
+function admLxClose(){ document.getElementById('admlx').classList.remove('open'); document.body.style.overflow=''; }
+function admLxShow(i){
+  if(i<0) i=_AP.length-1; if(i>=_AP.length) i=0; _AC=i;
+  document.getElementById('admlx-img').src = _AP[i];
+  document.getElementById('admlx-info').textContent = _AT + ' — ' + (i+1) + ' / ' + _AP.length;
+  var dl = document.getElementById('admlx-dl'); dl.href = _AP[i]; dl.download = 'lumina_foto_'+(i+1)+'.jpg';
+  document.getElementById('admlx-strip').innerHTML = _AP.map(function(p,j){
+    return '<img src="'+p+'" class="'+(j===i?'on':'')+'" onclick="admLxShow('+j+')" onerror="this.style.display=\'none\'">';
+  }).join('');
 }
+function admLxNav(d){ admLxShow(_AC+d); }
 
-function closeLightbox() {
-  document.getElementById('lx').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-function lxShow(i) {
-  if (i < 0) i = lxPhotos.length - 1;
-  if (i >= lxPhotos.length) i = 0;
-  lxCur = i;
-  const img = document.getElementById('lx-img');
-  img.src = lxPhotos[i];
-  document.getElementById('lx-info').textContent = lxTitle + ' — ' + (i+1) + ' / ' + lxPhotos.length;
-  const dl = document.getElementById('lx-download');
-  dl.href = lxPhotos[i];
-  dl.download = 'lumina_foto_' + (i+1) + '.jpg';
-  // Thumbnails
-  const strip = document.getElementById('lx-strip');
-  strip.innerHTML = lxPhotos.map((p,j) =>
-    `<img src="${p}" class="${j===i?'active':''}" onclick="lxShow(${j})"
-      onerror="this.style.display='none'">`
-  ).join('');
-}
-
-function lxNav(d) { lxShow(lxCur + d); }
-
-// Download all photos for an order
-function downloadAll(photos, title) {
-  if (photos.length === 0) return;
-  if (!confirm('Lejupielādēt visas ' + photos.length + ' fotogrāfijas?')) return;
-  // Create hidden iframe links for each photo to avoid popup blocker
-  const slug = (title||'foto').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  let i = 0;
-  function dlNext() {
+function admDlAll(photos, title) {
+  if (!photos || !photos.length) return;
+  if (!confirm('Lejupielādēt ' + photos.length + ' foto?')) return;
+  var slug = (title||'foto').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var i = 0;
+  function next() {
     if (i >= photos.length) return;
-    const url = photos[i];
-    const a = document.createElement('a');
-    // Force download via fetch blob to bypass same-origin issues
-    fetch(url)
-      .then(r => r.blob())
-      .then(blob => {
-        const blobUrl = URL.createObjectURL(blob);
-        a.href = blobUrl;
-        a.download = 'lumina_' + slug + '_' + String(i+1).padStart(2,'0') + '.' + (url.split('.').pop().split('?')[0] || 'jpg');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        i++;
-        setTimeout(dlNext, 600);
+    fetch(photos[i])
+      .then(function(r){ return r.blob(); })
+      .then(function(blob){
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'lumina_' + slug + '_' + String(i+1).padStart(2,'0') + '.jpg';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+        i++; setTimeout(next, 700);
       })
-      .catch(() => {
-        // Fallback: open in new tab
-        window.open(url, '_blank');
-        i++;
-        setTimeout(dlNext, 300);
-      });
+      .catch(function(){ window.open(photos[i],'_blank'); i++; setTimeout(next,400); });
   }
-  dlNext();
+  next();
 }
-
-// Keyboard navigation
-document.addEventListener('keydown', e => {
-  if (!document.getElementById('lx').classList.contains('open')) return;
-  if (e.key === 'ArrowLeft') lxNav(-1);
-  if (e.key === 'ArrowRight') lxNav(1);
-  if (e.key === 'Escape') closeLightbox();
-});
-
-// Click outside closes
-document.getElementById('lx').addEventListener('click', function(e) {
-  if (e.target === this) closeLightbox();
+document.addEventListener('keydown', function(e){
+  if (!document.getElementById('admlx').classList.contains('open')) return;
+  if (e.key==='ArrowLeft') admLxNav(-1);
+  else if (e.key==='ArrowRight') admLxNav(1);
+  else if (e.key==='Escape') admLxClose();
 });
 </script>
 

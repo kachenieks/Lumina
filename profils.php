@@ -161,7 +161,13 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
     <?php elseif ($activeTab === 'pasutijumi'): ?>
     <?php
     $pasutijumi = [];
-    $pRes = mysqli_query($savienojums, "SELECT * FROM pasutijumi WHERE klienta_id=$klientsId ORDER BY izveidots DESC");
+    $klientsEpasts = escape($savienojums, $_SESSION['klients_epasts'] ?? '');
+    $pRes = mysqli_query($savienojums,
+      "SELECT * FROM pasutijumi
+       WHERE klienta_id=$klientsId
+          OR (klienta_id=0 AND viesis_epasts='$klientsEpasts' AND '$klientsEpasts' != '')
+       ORDER BY izveidots DESC"
+    );
     while ($p = mysqli_fetch_assoc($pRes)) $pasutijumi[] = $p;
 
     function getProfFotos(array $p): array {
