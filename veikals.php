@@ -503,10 +503,15 @@ if (isset($_SESSION['klients_id'])) {
         <div class="editor-step">
           <div class="editor-step-num" id="notesStepNum">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
-          <textarea id="orderNotes" class="form-textarea" style="height:65px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
-          <?php if (!isset($_SESSION['klients_id'])): ?>
+          <textarea id="orderNotes" class="form-textarea" style="height:55px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
           <div style="margin-top:10px;">
-            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam)</label>
+            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Piegādes adrese <span style="color:var(--gold);">*</span></label>
+            <input type="text" id="deliveryAddrField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="Omniva Rīga 1, vai ielas adrese" required>
+            <div style="font-size:10px;color:var(--grey2);margin-top:3px;">Omniva / DPD pakomāts vai mājas adrese</div>
+          </div>
+          <?php if (!isset($_SESSION['klients_id'])): ?>
+          <div style="margin-top:8px;">
+            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam) <span style="color:var(--gold);">*</span></label>
             <input type="email" id="guestEmailField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="jusu@epasts.lv">
           </div>
           <?php endif; ?>
@@ -652,6 +657,10 @@ function openPhotoEditor(productId) {
   // Ensure all fields exist with safe defaults
   p = Object.assign({fotos:1, izmers:'', orient:'portrait', tips:'druka'}, p);
   editorProduct = p;
+
+  // Clear delivery address field for new product
+  const _da = document.getElementById('deliveryAddrField');
+  if (_da) { _da.value = ''; _da.style.borderColor = ''; }
 
   // Update topbar
   document.getElementById('editorProductName').textContent = p.title + (p.izmers ? ' · ' + p.izmers : '');
@@ -952,6 +961,8 @@ function checkEditorReady() {
 // ── SUBMIT ────────────────────────────────────────────
 function addPhotoToCart() {
   if (!editorProduct || editorPhotos.length < editorProduct.fotos) return;
+  const _da = document.getElementById('deliveryAddrField');
+  if (_da && !_da.value.trim()) { _da.focus(); _da.style.borderColor='var(--gold)'; showToast('Lūdzu ievadiet piegādes adresi', 'error'); return; }
   const btn = document.getElementById('orderBtn');
   const totalPhotos = editorPhotos.length;
   btn.textContent = 'Augšupielādē ' + totalPhotos + ' foto...';
@@ -974,7 +985,10 @@ function addPhotoToCart() {
     fd2.append('add_photo_to_cart', '1');
     fd2.append('produkts', editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
     fd2.append('cena', editorProduct.price);
-    fd2.append('notes', document.getElementById('orderNotes').value);
+    const deliveryAddr = (document.getElementById('deliveryAddrField')?.value || '').trim();
+    const notesVal = document.getElementById('orderNotes').value.trim();
+    const fullNotes = [notesVal, deliveryAddr ? 'Piegādes adrese: ' + deliveryAddr : ''].filter(Boolean).join(' | ');
+    fd2.append('notes', fullNotes);
     // Send guest email if not logged in
     const guestEmailEl = document.getElementById('guestEmailField');
     if (guestEmailEl && guestEmailEl.value.trim()) {

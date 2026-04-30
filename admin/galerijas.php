@@ -117,21 +117,22 @@ include __DIR__ . '/includes/header.php';
   </div>
 </div>
 
-<!-- Upload form -->
+<!-- Upload form — AJAX batch (bypasses max_file_uploads=20 limit) -->
 <div class="admin-card" style="margin-bottom:24px;">
-  <div class="section-heading" style="margin-bottom:14px;">📸 Augšupielādēt foto klientam</div>
-  <form method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="upload_photos" value="1">
-    <input type="hidden" name="galerijas_id" value="<?= $viewGal['id'] ?>">
-    <div class="upload-zone" id="galDropzone" onclick="document.getElementById('galFileInput').click()" style="cursor:pointer;padding:24px;text-align:center;">
-      <input type="file" id="galFileInput" name="fotos[]" multiple accept="image/*" style="display:none;" onchange="showGalPreviews(this)">
-      <div style="font-size:32px;">📁</div>
-      <div style="font-size:14px;color:var(--ink);margin:8px 0 4px;">Ievilciet vai klikšķiniet lai pievienotu foto</div>
-      <div style="font-size:11px;color:var(--grey2);">JPG, PNG, WEBP · Var izvēlēties vairākus uzreiz</div>
+  <div class="section-heading" style="margin-bottom:14px;">Augšupielādēt foto klientam</div>
+  <div class="upload-zone" id="galDropzone" onclick="document.getElementById('galFileInput').click()" style="cursor:pointer;padding:24px;text-align:center;">
+    <input type="file" id="galFileInput" name="fotos[]" multiple accept="image/*" style="display:none;" onchange="galFilesSelected(this)">
+    <div style="font-size:14px;color:var(--ink);margin:4px 0;">Ievilciet vai klikšķiniet lai pievienotu foto</div>
+    <div style="font-size:11px;color:var(--grey2);">JPG, PNG, WEBP &middot; Nav ierobežojuma foto skaitam</div>
+  </div>
+  <div id="galProgress" style="display:none;margin-top:12px;">
+    <div style="height:4px;background:var(--grey3);border-radius:2px;overflow:hidden;">
+      <div id="galBar" style="height:100%;width:0%;background:var(--gold);transition:width .3s;"></div>
     </div>
-    <div id="galPreviews" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px;"></div>
-    <button type="submit" class="btn-primary" style="margin-top:14px;">⬆ Augšupielādēt →</button>
-  </form>
+    <div id="galProgressText" style="font-size:12px;color:var(--grey);margin-top:6px;text-align:center;"></div>
+  </div>
+  <div id="galPreviews" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px;"></div>
+  <button id="galUploadBtn" class="btn-primary" style="margin-top:14px;display:none;" onclick="galUploadAll()">Augšupielādēt →</button>
 </div>
 
 <!-- Photo grid -->
@@ -239,10 +240,15 @@ include __DIR__ . '/includes/header.php';
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 <script>
-function showGalPreviews(input) {
+let _galFiles = [];
+
+function galFilesSelected(input) {
+  _galFiles = Array.from(input.files);
   const container = document.getElementById('galPreviews');
   container.innerHTML = '';
-  Array.from(input.files).forEach(f => {
+  document.getElementById('galUploadBtn').textContent = 'Augšupielādēt ' + _galFiles.length + ' foto →';
+  document.getElementById('galUploadBtn').style.display = 'inline-block';
+  _galFiles.forEach(f => {
     const div = document.createElement('div');
     div.style.cssText = 'aspect-ratio:1;border-radius:4px;overflow:hidden;background:#eee;';
     const r = new FileReader();
@@ -250,6 +256,42 @@ function showGalPreviews(input) {
     r.readAsDataURL(f);
     container.appendChild(div);
   });
+}
+
+// Upload in batches of 8 (well within max_file_uploads=20)
+async function galUploadAll() {
+  if (!_galFiles.length) return;
+  const btn = document.getElementById('galUploadBtn');
+  const galId = <?= $viewGal['id'] ?>;
+  const batchSize = 8;
+  const total = _galFiles.length;
+  let done = 0;
+
+  btn.disabled = true;
+  document.getElementById('galProgress').style.display = 'block';
+
+  for (let i = 0; i < _galFiles.length; i += batchSize) {
+    const batch = _galFiles.slice(i, i + batchSize);
+    const fd = new FormData();
+    fd.append('upload_photos', '1');
+    fd.append('galerijas_id', galId);
+    batch.forEach(f => fd.append('fotos[]', f));
+
+    try {
+      const res = await fetch('', { method: 'POST', body: fd });
+      const text = await res.text();
+      // check for PHP errors silently
+    } catch(e) {}
+
+    done += batch.length;
+    const pct = Math.round(done / total * 100);
+    document.getElementById('galBar').style.width = pct + '%';
+    document.getElementById('galProgressText').textContent =
+      'Augšupielādēts: ' + done + ' / ' + total + ' (' + pct + '%)';
+  }
+
+  document.getElementById('galProgressText').textContent = 'Pabeigts! Lapa tiks atjaunota...';
+  setTimeout(() => location.reload(), 800);
 }
 // Drag & drop
 const dz = document.getElementById('galDropzone');

@@ -310,19 +310,22 @@ function mailGalerijaViesis(string $epasts, string $vards, string $galNosaukums,
 }
 
 // ── Foto pasūtījums pabeigts — klientam ─────────────────────────────────────
-function mailFotoPasutijumsPabeigts(string $epasts, string $vards, string $produkts, string $adrese = ''): bool {
-  $adreseHtml = $adrese
-    ? '<div style="margin:16px 0;padding:12px 16px;background:#f8f6f1;border-left:3px solid #B8975A;font-size:14px;"><strong>Piegādes adrese:</strong><br>' . htmlspecialchars($adrese) . '</div>'
+function mailFotoPasutijumsPabeigts(string $epasts, string $vards, string $produkts, string $izsekosanas = ''): bool {
+  $trackHtml = $izsekosanas
+    ? '<div style="margin:16px 0;padding:14px 18px;background:#f8f6f1;border:1px solid #B8975A;border-radius:4px;">'
+      . '<div style="font-size:10px;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Izsekošanas kods</div>'
+      . '<div style="font-size:20px;font-weight:700;color:#1a1a1a;letter-spacing:2px;font-family:monospace;">' . htmlspecialchars($izsekosanas) . '</div>'
+      . '</div>'
     : '';
-  $html = emailHeader('Jūsu pasūtījums ir ceļā!')
+  $html = emailHeader('Jūsu pasūtījums ir ceļā! 📦')
     . emailGreeting($vards)
-    . '<p style="color:#555;line-height:1.7;margin:0 0 16px;">Priecājamies informēt, ka Jūsu foto pasūtījums ir sagatavots un nosūtīts!</p>'
+    . '<p style="color:#555;line-height:1.7;margin:0 0 16px;">Priecājamies informēt, ka Jūsu foto pasūtījums ir sagatavots un nosūtīts uz Jūsu norādīto adresi!</p>'
     . '<div style="background:#f8f6f1;border:1px solid #e8e3da;padding:14px 18px;margin:0 0 16px;border-radius:4px;">'
     . '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Pasūtījums</div>'
     . '<div style="font-size:17px;color:#1a1a1a;">' . htmlspecialchars($produkts) . '</div>'
     . '</div>'
-    . $adreseHtml
-    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;">Ja Jums ir kādi jautājumi, droši sazinieties ar mums!</p>'
+    . $trackHtml
+    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;">Ja Jums ir kādi jautājumi par piegādi, droši sazinieties ar mums!</p>'
     . emailBtn('mailto:katrinablazkova06@gmail.com', 'Sazināties ar fotogrāfi');
   return luminaMail($epasts, $vards, 'Jūsu LUMINA foto pasūtījums ir nosūtīts — ' . $produkts, $html);
 }

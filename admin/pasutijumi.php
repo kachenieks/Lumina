@@ -242,9 +242,9 @@ include __DIR__ . '/includes/header.php';
       <?php endif; ?>
 
       <?php if (!in_array($sl, ['pabeigts','atcelts'])): ?>
-      <!-- Pabeigts — opens delivery address modal first -->
+      <!-- Pabeigts — opens delivery modal showing client's address -->
       <button class="action-btn"
-        onclick="openDelivery(<?= $oid ?>, '<?= htmlspecialchars($filter) ?>')">Pabeigts</button>
+        onclick="openDelivery(<?= $oid ?>, '<?= htmlspecialchars($filter) ?>', <?= json_encode($o['papildu_info'] ?? '') ?>)">Pabeigts</button>
       <?php endif; ?>
 
       <?php if ($sl !== 'atcelts'): ?>
@@ -267,26 +267,30 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
-<!-- Delivery address modal -->
+<!-- Delivery modal — shows client's address + admin adds tracking code -->
 <div id="deliveryModal" onclick="if(event.target===this)closeDelivery()">
   <div id="deliveryBox">
     <div style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:6px;">Atzīmēt kā pabeigtu</div>
-    <p style="font-size:13px;color:var(--grey);margin-bottom:18px;">Ievadiet piegādes adresi vai pakomāta kodu. Klientam tiks nosūtīts e-pasta paziņojums.</p>
+    <p style="font-size:13px;color:var(--grey);margin-bottom:18px;">Pārbaudiet klienta norādīto piegādes adresi un pievienojiet izsekošanas kodu.</p>
     <form method="POST" id="deliveryForm">
       <input type="hidden" name="status_update" value="1">
       <input type="hidden" name="status" value="pabeigts">
       <input type="hidden" name="id" id="deliveryId">
       <input type="hidden" name="filter" id="deliveryFilter">
       <div style="margin-bottom:14px;">
-        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:6px;">Piegādes adrese vai pakomāts</label>
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:6px;">Klienta norādītā adrese</label>
+        <div id="clientDeliveryAddr" style="font-size:13px;background:var(--cream2);padding:10px 12px;border-radius:4px;min-height:36px;color:var(--ink);"></div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:6px;">Izsekošanas kods (neobligāts)</label>
         <input type="text" name="piegades_adrese" id="deliveryAddr" class="form-input"
-          placeholder="Omniva Rīga Centrālā stacija / Raiņa iela 5, Rīga"
+          placeholder="LV123456789EE vai cits kods"
           style="width:100%;box-sizing:border-box;">
-        <div style="font-size:11px;color:var(--grey2);margin-top:4px;">Neobligāts — atstājiet tukšu ja nosūtāt manuāli</div>
+        <div style="font-size:11px;color:var(--grey2);margin-top:4px;">Tiks iekļauts e-pastā klientam</div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" onclick="closeDelivery()" class="action-btn">Atcelt</button>
-        <button type="submit" class="btn-primary" style="padding:8px 22px;">Apstiprināt un nosūtīt e-pastu</button>
+        <button type="submit" class="btn-primary" style="padding:8px 22px;">Nosūtīt un atzīmēt kā pabeigtu</button>
       </div>
     </form>
   </div>
@@ -307,10 +311,18 @@ include __DIR__ . '/includes/header.php';
 
 <script>
 // Delivery modal
-function openDelivery(id, filter) {
+function openDelivery(id, filter, notes) {
   document.getElementById('deliveryId').value = id;
   document.getElementById('deliveryFilter').value = filter;
   document.getElementById('deliveryAddr').value = '';
+  // Extract delivery address from notes
+  var clientAddr = '';
+  if (notes) {
+    var m = notes.match(/Piegādes adrese:\s*([^
+|]+)/);
+    if (m) clientAddr = m[1].trim();
+  }
+  document.getElementById('clientDeliveryAddr').textContent = clientAddr || '(Nav norādīta)';
   document.getElementById('deliveryModal').classList.add('open');
   document.getElementById('deliveryAddr').focus();
 }

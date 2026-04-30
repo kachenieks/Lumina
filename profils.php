@@ -233,24 +233,24 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
         $sl_label = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprin&#257;ts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaks&#257;ts'];
         $photos = getProfFotos($p);
         $pc = count($photos);
-        $pj = json_encode($photos);
-        $pt = json_encode(htmlspecialchars($p['produkts']));
+        $photosDataAttr = htmlspecialchars(json_encode($photos, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES);
+        $titleDataAttr  = htmlspecialchars($p['produkts'] ?? '', ENT_QUOTES);
       ?>
-      <div class="prl-card">
+      <div class="prl-card" data-photos="<?= $photosDataAttr ?>" data-title="<?= $titleDataAttr ?>">
         <div class="prl-photos">
           <?php if ($pc > 0): ?>
           <img src="<?= htmlspecialchars($photos[0]) ?>" class="prl-main-img" alt=""
-            onclick="plxOpen(<?= $pj ?>,0,<?= $pt ?>)"
+            onclick="profPlxOpen(this)"
             onerror="this.style.background='var(--cream2)';this.style.display='none'">
           <?php if ($pc > 1): ?>
           <div class="prl-thumbs">
             <?php for($ti=1;$ti<=min(2,$pc-1);$ti++): ?>
-            <img src="<?= htmlspecialchars($photos[$ti]) ?>" class="prl-thumb"
-              onclick="plxOpen(<?= $pj ?>,<?= $ti ?>,<?= $pt ?>)"
+            <img src="<?= htmlspecialchars($photos[$ti]) ?>" class="prl-thumb" data-idx="<?= $ti ?>"
+              onclick="profPlxOpen(this, <?= $ti ?>)"
               onerror="this.style.display='none'">
             <?php endfor; ?>
             <?php if($pc>3): ?>
-            <div class="prl-more" onclick="plxOpen(<?= $pj ?>,3,<?= $pt ?>)">+<?= $pc-3 ?></div>
+            <div class="prl-more" onclick="profPlxOpen(this, 3)">+<?= $pc-3 ?></div>
             <?php endif; ?>
           </div>
           <?php endif; ?>
@@ -265,7 +265,7 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
           </div>
           <?php if($pc>0): ?>
           <div style="font-size:11px;color:var(--grey);margin-bottom:6px;">
-            <?= $pc ?> foto &middot; <span style="color:var(--gold);cursor:pointer;" onclick="plxOpen(<?= $pj ?>,0,<?= $pt ?>)">Skat&#299;t visu &rarr;</span>
+            <?= $pc ?> foto &middot; <span style="color:var(--gold);cursor:pointer;" onclick="profPlxOpen(this, 0)">Skat&#299;t visu &rarr;</span>
           </div>
           <?php endif; ?>
           <?php if(!empty($p['papildu_info'])): ?>
@@ -292,15 +292,36 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
     </div>
     <script>
     var _P=[],_C=0,_T='';
-    function plxOpen(p,i,t){_P=p;_C=i;_T=t;document.getElementById('plx').classList.add('open');document.body.style.overflow='hidden';_plxS(i);}
+
+    // Find parent card's data-photos attribute
+    function profPlxOpen(el, idx) {
+      idx = idx || 0;
+      var card = el.closest('[data-photos]');
+      if (!card) return;
+      var photos = JSON.parse(card.dataset.photos);
+      var title  = card.dataset.title || '';
+      _P=photos; _T=title;
+      document.getElementById('plx').classList.add('open');
+      document.body.style.overflow='hidden';
+      _plxS(idx);
+    }
     function plxClose(){document.getElementById('plx').classList.remove('open');document.body.style.overflow='';}
-    function _plxS(i){if(i<0)i=_P.length-1;if(i>=_P.length)i=0;_C=i;
+    function _plxS(i){
+      if(i<0)i=_P.length-1;if(i>=_P.length)i=0;_C=i;
       var im=document.getElementById('plx-img');im.src=_P[i];
       document.getElementById('plx-info').textContent=_T+' — '+(i+1)+' / '+_P.length;
       var dl=document.getElementById('plx-dl');dl.href=_P[i];dl.download='lumina_foto_'+(i+1)+'.jpg';
-      document.getElementById('plx-strip').innerHTML=_P.map(function(p,j){return'<img src="'+p+'" class="'+(j===i?'active':'')+'" onclick="_plxS('+ j +')" onerror="this.style.display=\'none\'">';}).join('');}
+      document.getElementById('plx-strip').innerHTML=_P.map(function(p,j){
+        return '<img src="'+p+'" class="'+(j===i?'active':'')+'" onclick="_plxS('+j+')" onerror="this.style.display='none'">';
+      }).join('');
+    }
     function plxNav(d){_plxS(_C+d);}
-    document.addEventListener('keydown',function(e){if(!document.getElementById('plx').classList.contains('open'))return;if(e.key==='ArrowLeft')plxNav(-1);else if(e.key==='ArrowRight')plxNav(1);else if(e.key==='Escape')plxClose();});
+    document.addEventListener('keydown',function(e){
+      if(!document.getElementById('plx').classList.contains('open'))return;
+      if(e.key==='ArrowLeft')plxNav(-1);
+      else if(e.key==='ArrowRight')plxNav(1);
+      else if(e.key==='Escape')plxClose();
+    });
     </script>
     <!-- ── GALERIJAS ── -->
     <?php elseif ($activeTab === 'galerijas'): ?>
