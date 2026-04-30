@@ -106,8 +106,8 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Tabs -->
 <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border);">
-  <a href="?tab=rezervacijas" style="padding:10px 22px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:<?= $tab==='rezervacijas'?'2px solid var(--gold)':'2px solid transparent' ?>;color:<?= $tab==='rezervacijas'?'var(--gold)':'var(--grey2)' ?>;margin-bottom:-2px;">📋 Rezervācijas (<?= count($items) ?>)</a>
-  <a href="?tab=calendar" style="padding:10px 22px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:<?= $tab==='calendar'?'2px solid var(--gold)':'2px solid transparent' ?>;color:<?= $tab==='calendar'?'var(--gold)':'var(--grey2)' ?>;margin-bottom:-2px;">📅 Mans Kalendārs</a>
+  <a href="?tab=rezervacijas" style="padding:10px 22px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:<?= $tab==='rezervacijas'?'2px solid var(--gold)':'2px solid transparent' ?>;color:<?= $tab==='rezervacijas'?'var(--gold)':'var(--grey2)' ?>;margin-bottom:-2px;">Rezervācijas (<?= count($items) ?>)</a>
+  <a href="?tab=calendar" style="padding:10px 22px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:<?= $tab==='calendar'?'2px solid var(--gold)':'2px solid transparent' ?>;color:<?= $tab==='calendar'?'var(--gold)':'var(--grey2)' ?>;margin-bottom:-2px;">Mans Kalendārs</a>
 </div>
 
 <?php if ($tab === 'rezervacijas'): ?>
@@ -164,37 +164,37 @@ include __DIR__ . '/includes/header.php';
             <a href="?status=apstiprinats&id=<?= $r['id'] ?>&tab=rezervacijas"
                onclick="return confirm('Apstiprināt un nosūtīt e-pastu klientam?')"
                style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
-               title="Apstiprināt — klients saņems e-pastu ✉">✓ Apstiprināt</a>
+               title="Apstiprināt — klients saņems e-pastu ✉">Apstiprināt</a>
             <?php elseif ($sl === 'apstiprinats'): ?>
-            <span style="padding:5px 9px;background:#f5f5f5;color:#aaa;border:1px solid #e0e0e0;border-radius:4px;font-size:11px;">✓ Apstiprināts</span>
+            <span style="padding:5px 9px;background:#f5f5f5;color:#aaa;border:1px solid #e0e0e0;border-radius:4px;font-size:11px;">Apstiprināts</span>
             <?php endif; ?>
             <?php if ($sl !== 'pabeigts' && $sl !== 'atcelts'): ?>
             <a href="?status=pabeigts&id=<?= $r['id'] ?>&tab=rezervacijas"
                onclick="return confirm('Atzīmēt kā pabeigtu? Klients saņems paziņojumu.')"
                style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#e8f4fd;color:#1565c0;border:1px solid #90caf9;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
-               title="Sesija pabeigta — klients saņems e-pastu">✔ Pabeigts</a>
+               title="Sesija pabeigta — klients saņems e-pastu">Pabeigts</a>
             <?php endif; ?>
             <?php if ($sl === 'pabeigts'): ?>
             <a href="?create_gallery=<?= $r['id'] ?>&tab=rezervacijas"
                onclick="return confirm('Izveidot jaunu galeriju šim klientam?')"
                style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
-               title="Izveidot galeriju un nosūtīt piekļuves kodu">📁 Galeriju</a>
+               title="Izveidot galeriju un nosūtīt piekļuves kodu">Galeriju</a>
             <?php endif; ?>
             <?php if ($sl !== 'atcelts'): ?>
             <a href="?status=atcelts&id=<?= $r['id'] ?>&tab=rezervacijas"
                onclick="return confirm('Atcelt? Klients saņems atcelšanas e-pastu.')"
                style="display:inline-flex;align-items:center;gap:3px;padding:5px 9px;background:#fef0f0;color:#b71c1c;border:1px solid #ef9a9a;border-radius:4px;font-size:11px;font-weight:600;text-decoration:none;"
-               title="Atcelt un informēt klientu">✕ Atcelt</a>
+               title="Atcelt un informēt klientu">Atcelt</a>
             <?php endif; ?>
             <a href="?delete=<?= $r['id'] ?>&tab=rezervacijas"
                onclick="return confirm('Dzēst rezervāciju #<?= $r['id'] ?>? Nevar atsaukt.')"
                style="padding:5px 8px;background:#f5f5f5;color:#888;border:1px solid #ddd;border-radius:4px;font-size:11px;text-decoration:none;"
-               title="Dzēst ierakstu">🗑</a>
+               title="Dzēst ierakstu">Dzēst</a>
           </div>
         </td>
       </tr>
       <?php if ($r['papildu_info']): ?>
-      <tr><td colspan="8" style="background:var(--cream2);font-size:11px;color:var(--grey2);font-style:italic;padding:6px 16px;">💬 <?= htmlspecialchars($r['papildu_info']) ?></td></tr>
+      <tr><td colspan="8" style="background:var(--cream2);font-size:11px;color:var(--grey2);font-style:italic;padding:6px 16px;"><?= htmlspecialchars($r['papildu_info']) ?></td></tr>
       <?php endif; ?>
       <?php endforeach; ?>
       <?php if (empty($items)): ?><tr><td colspan="8" style="text-align:center;padding:36px;color:var(--grey2);">Nav rezervāciju</td></tr><?php endif; ?>
@@ -222,7 +222,7 @@ include __DIR__ . '/includes/header.php';
 
   <!-- Day settings form -->
   <div class="admin-card" style="position:sticky;top:80px;">
-    <div class="section-heading" style="margin-bottom:16px;">⚙ Rediģēt dienu</div>
+    <div class="section-heading" style="margin-bottom:16px;">Rediģēt dienu</div>
     <div style="margin-bottom:14px;padding:10px 14px;background:var(--cream2);border-radius:6px;font-size:13px;color:var(--grey2);">
       Klikšķiniet uz datuma kalendārā lai to rediģētu
     </div>
@@ -250,14 +250,14 @@ include __DIR__ . '/includes/header.php';
         <label class="form-label">Piezīme (privāta)</label>
         <input type="text" name="piezime" id="availNote" class="form-input" placeholder="Atvaļinājums, slimnīca...">
       </div>
-      <button type="submit" class="btn-primary" style="width:100%;">💾 Saglabāt dienu →</button>
+      <button type="submit" class="btn-primary" style="width:100%;">Saglabāt dienu →</button>
     </form>
 
     <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
       <div class="section-heading" style="margin-bottom:10px;font-size:13px;">Ātrie iestatījumi</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <button onclick="setWeek(true)" class="action-btn success" style="text-align:left;">✓ Nākamā nedēļa — pieejama</button>
-        <button onclick="setWeek(false)" class="action-btn danger" style="text-align:left;">✕ Nākamā nedēļa — nav pieejama</button>
+        <button onclick="setWeek(true)" class="action-btn success" style="text-align:left;">Nākamā nedēļa — pieejama</button>
+        <button onclick="setWeek(false)" class="action-btn danger" style="text-align:left;">Nākamā nedēļa — nav pieejama</button>
       </div>
     </div>
   </div>
@@ -337,7 +337,7 @@ function selectDate(date, pieejams, from, to, note) {
   document.getElementById('availFrom').value = from || '09:00';
   document.getElementById('availTo').value = to || '18:00';
   document.getElementById('availNote').value = note || '';
-  document.querySelector('.admin-card .section-heading').textContent = '⚙ Rediģēt: ' + date;
+  document.querySelector('.admin-card .section-heading').textContent = 'Rediģēt: ' + date;
   document.querySelector('.admin-card .section-heading').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 

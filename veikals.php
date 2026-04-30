@@ -93,7 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart']))
     echo json_encode(['error' => 'Nav pievienotu fotogrāfiju']); exit;
   }
 
-  $cartKey = 'foto_' . uniqid();
+  // Check for duplicate: same product already in cart — overwrite instead of adding
+  $existingKey = null;
+  foreach ($_SESSION['cart'] as $k => $item) {
+    if (!empty($item['is_foto']) && ($item['name'] ?? '') === strip_tags($produktsName)) {
+      $existingKey = $k;
+      break;
+    }
+  }
+  $cartKey = $existingKey ?: ('foto_' . uniqid());
   $_SESSION['cart'][$cartKey] = [
     'qty'        => 1,
     'name'       => strip_tags($produktsName),
@@ -1014,7 +1022,7 @@ function handleCartResponse(data) {
     closeModal('photoEditorModal');
     showToast((editorProduct ? editorProduct.title : 'Prece') + ' pievienots grozam ✓', 'success');
     // Reset editor state
-    editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0;
+    editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0; editorProduct = null;
     document.querySelectorAll('.gal-pick').forEach(el => {
       el.style.borderColor = 'transparent';
       const chk = el.querySelector('.gal-pick-check');
@@ -1025,6 +1033,8 @@ function handleCartResponse(data) {
     if (thumbs) thumbs.innerHTML = '';
     const notes = document.getElementById('orderNotes');
     if (notes) notes.value = '';
+    const guestField = document.getElementById('guestEmailField');
+    if (guestField) guestField.value = '';
     if (typeof checkEditorReady === 'function') checkEditorReady();
     if (typeof updateEditorCount === 'function') updateEditorCount();
   } else {

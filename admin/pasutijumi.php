@@ -5,14 +5,47 @@ require_once __DIR__ . '/../includes/db.php';
 if (!isset($_SESSION['admin_auth'])) { header('Location: /4pt/blazkova/lumina/Lumina/admin/login.php'); exit; }
 $pageTitle = 'Foto pasūtījumi';
 
-function escape2($db, $s) { return mysqli_real_escape_string($db, $s); }
+// Status update (POST for reliability)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['status_update'])) {
+  $id     = (int)$_POST['id'];
+  $status = in_array($_POST['status'], ['jauns','apstiprinats','pabeigts','atcelts']) ? $_POST['status'] : 'jauns';
+  $piegades_adrese = trim($_POST['piegades_adrese'] ?? '');
 
-// Status update
-if (isset($_GET['status'], $_GET['id'])) {
-  $id     = (int)$_GET['id'];
-  $status = in_array($_GET['status'], ['jauns','apstiprinats','pabeigts','atcelts']) ? $_GET['status'] : 'jauns';
   mysqli_query($savienojums, "UPDATE pasutijumi SET statuss='$status' WHERE id=$id");
-  $f = isset($_GET['filter']) ? '&filter='.urlencode($_GET['filter']) : '';
+
+  // Save delivery address if provided
+  if ($piegades_adrese) {
+    $adrEsc = escape($savienojums, $piegades_adrese);
+    // Store in papildu_info or separate column — append to notes
+    $curr = mysqli_fetch_assoc(mysqli_query($savienojums, "SELECT papildu_info, klienta_id, produkts, viesis_epasts FROM pasutijumi WHERE id=$id"));
+    $newNote = trim(($curr['papildu_info'] ?? '') . "\nPiegādes adrese: " . $piegades_adrese);
+    $newNoteEsc = escape($savienojums, $newNote);
+    mysqli_query($savienojums, "UPDATE pasutijumi SET papildu_info='$newNoteEsc' WHERE id=$id");
+  }
+
+  // Send email on pabeigts
+  if ($status === 'pabeigts') {
+    $ord = mysqli_fetch_assoc(mysqli_query($savienojums,
+      "SELECT p.*, k.vards, k.uzvards, k.epasts FROM pasutijumi p
+       LEFT JOIN klienti k ON p.klienta_id = k.id AND p.klienta_id > 0
+       WHERE p.id=$id"
+    ));
+    $recipEmail = $ord['epasts'] ?: ($ord['viesis_epasts'] ?? '');
+    $recipVards = $ord['vards'] ? $ord['vards'].' '.($ord['uzvards']??'') : 'Klients';
+    if ($recipEmail) {
+      try {
+        require_once __DIR__ . '/../includes/mailer.php';
+        if (function_exists('mailFotoPasutijumsPabeigts')) {
+          mailFotoPasutijumsPabeigts($recipEmail, $recipVards, $ord['produkts'], $piegades_adrese);
+        } elseif (function_exists('mailFotoPasutijumsKlients')) {
+          mailFotoPasutijumsKlients($recipEmail, $recipVards, $ord['produkts'],
+            'Jūsu pasūtījums ir pabeigts un nosūtīts!' . ($piegades_adrese ? ' Piegādes adrese: '.$piegades_adrese : ''));
+        }
+      } catch (\Throwable $e) { error_log('Mail err: '.$e->getMessage()); }
+    }
+  }
+
+  $f = isset($_POST['filter']) ? '&filter='.urlencode($_POST['filter']) : '';
   header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=updated'.$f); exit;
 }
 
@@ -35,9 +68,9 @@ if (isset($_GET['delete'])) {
   header('Location: /4pt/blazkova/lumina/Lumina/admin/pasutijumi.php?msg=deleted'.$f); exit;
 }
 
-// Fetch orders
+// Fetch orders — newest first
 $filter = $_GET['filter'] ?? '';
-$where  = $filter ? "WHERE p.statuss='".escape2($savienojums,$filter)."'" : '';
+$where  = $filter ? "WHERE p.statuss='".escape($savienojums,$filter)."'" : '';
 $orders = [];
 $res = mysqli_query($savienojums,
   "SELECT p.*, k.vards, k.uzvards, k.epasts
@@ -48,26 +81,21 @@ $res = mysqli_query($savienojums,
 );
 while ($r = mysqli_fetch_assoc($res)) $orders[] = $r;
 
-// Build photo URL list for one order
 function orderPhotos(array $o): array {
   $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
   $out  = [];
   if (!empty($o['foto_urls'])) {
     $arr = json_decode($o['foto_urls'], true);
     if (is_array($arr)) {
-      foreach ($arr as $u) {
-        $u = trim($u); if (!$u) continue;
-        $out[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
-      }
+      foreach ($arr as $u) { $u=trim($u); if ($u) $out[] = filter_var($u,FILTER_VALIDATE_URL)?$u:$base.basename($u); }
     } else {
-      $u = trim($o['foto_urls']);
-      if ($u) $out[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+      $u = trim($o['foto_urls']); if ($u) $out[] = filter_var($u,FILTER_VALIDATE_URL)?$u:$base.basename($u);
     }
   }
   if (!empty($o['foto_fails'])) {
     $u  = trim($o['foto_fails']);
-    $r2 = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
-    if (!in_array($r2, $out)) $out[] = $r2;
+    $r2 = filter_var($u,FILTER_VALIDATE_URL)?$u:$base.$u;
+    if (!in_array($r2,$out)) $out[] = $r2;
   }
   return array_values(array_unique(array_filter($out)));
 }
@@ -75,20 +103,27 @@ function orderPhotos(array $o): array {
 include __DIR__ . '/includes/header.php';
 ?>
 <style>
-.og { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px; }
-.oc { background:var(--white); border:1px solid var(--grey3); overflow:hidden; transition:box-shadow .2s; }
-.oc:hover { box-shadow:0 4px 20px rgba(0,0,0,.1); }
-.ob { padding:16px 18px; }
-.op { font-family:'Cormorant Garamond',serif; font-size:19px; color:var(--ink); margin-bottom:4px; }
-.om { font-size:11px; color:var(--grey2); margin-bottom:10px; }
-.oa { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px solid var(--grey3); }
-.sbadge { display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase; }
+.og{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;}
+.oc{background:var(--white);border:1px solid var(--grey3);overflow:hidden;transition:box-shadow .2s;}
+.oc:hover{box-shadow:0 4px 20px rgba(0,0,0,.09);}
+.ob{padding:16px 18px;}
+.opr{font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--ink);margin-bottom:4px;}
+.om{font-size:11px;color:var(--grey2);margin-bottom:10px;}
+.oa{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--grey3);}
+.sbadge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
 .s-jauns{background:#fff3e0;color:#e65100}.s-apstiprinats{background:#e8f5e9;color:#2e7d32}
 .s-pabeigts{background:#e3f2fd;color:#1565c0}.s-atcelts{background:#fce4ec;color:#c62828}.s-apmaksats{background:#f3e5f5;color:#6a1b9a}
-.strip { display:flex; gap:2px; overflow-x:auto; padding:2px; background:var(--cream2); }
-.strip img { width:66px;height:66px;object-fit:cover;flex-shrink:0;cursor:pointer;border:2px solid transparent;transition:.15s;border-radius:1px; }
-.strip img:hover { border-color:var(--gold); }
-.pcb { font-size:10px;color:var(--grey);padding:3px 8px;background:var(--cream2);border-bottom:1px solid var(--grey3);display:flex;justify-content:space-between;align-items:center; }
+.strip{display:flex;gap:2px;overflow-x:auto;padding:2px;background:var(--cream2);}
+.strip img{width:66px;height:66px;object-fit:cover;flex-shrink:0;cursor:pointer;border:2px solid transparent;transition:.15s;}
+.strip img:hover{border-color:var(--gold);}
+.pcb{font-size:10px;color:var(--grey);padding:3px 10px;background:var(--cream2);border-bottom:1px solid var(--grey3);display:flex;justify-content:space-between;align-items:center;}
+/* Status form — hidden by default */
+.status-form{display:none;margin-top:8px;background:var(--cream2);padding:12px;border-radius:4px;}
+.status-form.show{display:block;}
+/* Delivery modal */
+#deliveryModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;}
+#deliveryModal.open{display:flex;}
+#deliveryBox{background:var(--white);padding:28px 32px;max-width:420px;width:90%;border-radius:8px;}
 /* Lightbox */
 #admlx{display:none;position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:9999;flex-direction:column;align-items:center;justify-content:center;}
 #admlx.open{display:flex;}
@@ -121,7 +156,7 @@ include __DIR__ . '/includes/header.php';
 
 <?php if (empty($orders)): ?>
 <div style="text-align:center;padding:60px;color:var(--grey2);">
-  <div style="font-size:48px;opacity:.2;margin-bottom:12px;">🖼️</div><p>Nav pasūtījumu.</p>
+  <div style="font-size:36px;opacity:.15;margin-bottom:12px;">[ ]</div><p>Nav pasūtījumu.</p>
 </div>
 <?php else: ?>
 <div class="og">
@@ -131,7 +166,6 @@ include __DIR__ . '/includes/header.php';
   $pc     = count($photos);
   $flt    = urlencode($filter);
   $oid    = (int)$o['id'];
-  // Safe JSON for data attribute
   $photosData = htmlspecialchars(json_encode($photos, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES);
   $titleData  = htmlspecialchars($o['produkts'] ?? '', ENT_QUOTES);
   $dispEmail  = $o['epasts'] ?: ($o['viesis_epasts'] ?? '');
@@ -143,10 +177,9 @@ include __DIR__ . '/includes/header.php';
     <button data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
       onclick="admLxOpen(JSON.parse(this.dataset.photos), 0, this.dataset.title)"
       style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:0;">
-      Aplūkot visas →
+      Aplūkot visas
     </button>
   </div>
-  <!-- Main photo -->
   <div style="position:relative;cursor:pointer;"
     data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
     onclick="admLxOpen(JSON.parse(this.dataset.photos), 0, this.dataset.title)">
@@ -168,48 +201,65 @@ include __DIR__ . '/includes/header.php';
   </div>
   <?php endif; ?>
   <?php else: ?>
-  <div style="height:160px;display:flex;align-items:center;justify-content:center;background:var(--cream2);font-size:44px;opacity:.18;">🖼️</div>
+  <div style="height:140px;display:flex;align-items:center;justify-content:center;background:var(--cream2);font-size:11px;color:var(--grey2);letter-spacing:1px;">NAV FOTO</div>
   <?php endif; ?>
 
   <div class="ob">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
-      <div class="op"><?= htmlspecialchars($o['produkts'] ?? '') ?></div>
+      <div class="opr"><?= htmlspecialchars($o['produkts'] ?? '') ?></div>
       <span class="sbadge s-<?= $sl ?>"><?= ucfirst($sl) ?></span>
     </div>
     <div class="om">
       <?php if ($o['vards']): ?>
         <strong><?= htmlspecialchars($o['vards'].' '.($o['uzvards']??'')) ?></strong>
-        <?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
+        <?php if ($dispEmail): ?> &middot; <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
       <?php else: ?>
-        <em>Viesis</em><?php if ($dispEmail): ?> · <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);font-style:normal;"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
+        <em>Viesis</em><?php if ($dispEmail): ?> &middot; <a href="mailto:<?= htmlspecialchars($dispEmail) ?>" style="color:var(--gold);font-style:normal;"><?= htmlspecialchars($dispEmail) ?></a><?php endif; ?>
       <?php endif; ?>
-      <div style="margin-top:2px;">📅 <?= date('d.m.Y H:i', strtotime($o['izveidots'])) ?></div>
+      <div style="margin-top:2px;"><?= date('d.m.Y H:i', strtotime($o['izveidots'])) ?></div>
     </div>
     <?php if (!empty($o['papildu_info'])): ?>
-    <div style="font-size:12px;color:var(--grey);background:var(--cream);padding:7px 10px;border-left:2px solid var(--gold);margin-bottom:8px;">
-      <?= htmlspecialchars($o['papildu_info']) ?>
-    </div>
+    <div style="font-size:12px;color:var(--grey);background:var(--cream);padding:7px 10px;border-left:2px solid var(--gold);margin-bottom:8px;white-space:pre-line;"><?= htmlspecialchars($o['papildu_info']) ?></div>
     <?php endif; ?>
+
     <div class="oa">
       <?php if ($pc > 0): ?>
       <button data-photos="<?= $photosData ?>" data-title="<?= $titleData ?>"
         onclick="admDlAll(JSON.parse(this.dataset.photos), this.dataset.title)"
-        class="action-btn" style="cursor:pointer;">⬇ Lejupielādēt (<?= $pc ?>)</button>
+        class="action-btn" style="cursor:pointer;">Lejupielādēt (<?= $pc ?>)</button>
       <?php endif; ?>
+
       <?php if (in_array($sl, ['jauns','apmaksats'])): ?>
-      <a href="?status=apstiprinats&id=<?= $oid ?>&filter=<?= $flt ?>"
-         onclick="return confirm('Apstiprināt?')" class="action-btn success">✓ Apstiprināt</a>
+      <!-- Apstiprināt via POST form -->
+      <form method="POST" style="display:inline;">
+        <input type="hidden" name="status_update" value="1">
+        <input type="hidden" name="id" value="<?= $oid ?>">
+        <input type="hidden" name="status" value="apstiprinats">
+        <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>">
+        <button type="submit" class="action-btn success"
+          onclick="return confirm('Apstiprināt pasūtījumu?')">Apstiprināt</button>
+      </form>
       <?php endif; ?>
+
       <?php if (!in_array($sl, ['pabeigts','atcelts'])): ?>
-      <a href="?status=pabeigts&id=<?= $oid ?>&filter=<?= $flt ?>"
-         onclick="return confirm('Atzīmēt kā pabeigtu?')" class="action-btn">✔ Pabeigts</a>
+      <!-- Pabeigts — opens delivery address modal first -->
+      <button class="action-btn"
+        onclick="openDelivery(<?= $oid ?>, '<?= htmlspecialchars($filter) ?>')">Pabeigts</button>
       <?php endif; ?>
+
       <?php if ($sl !== 'atcelts'): ?>
-      <a href="?status=atcelts&id=<?= $oid ?>&filter=<?= $flt ?>"
-         onclick="return confirm('Atcelt pasūtījumu?')" class="action-btn danger">✕ Atcelt</a>
+      <form method="POST" style="display:inline;">
+        <input type="hidden" name="status_update" value="1">
+        <input type="hidden" name="id" value="<?= $oid ?>">
+        <input type="hidden" name="status" value="atcelts">
+        <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>">
+        <button type="submit" class="action-btn danger"
+          onclick="return confirm('Atcelt pasūtījumu?')">Atcelt</button>
+      </form>
       <?php endif; ?>
+
       <a href="?delete=<?= $oid ?>&filter=<?= $flt ?>"
-         onclick="return confirm('Dzēst #<?= $oid ?>?')" class="action-btn danger">🗑</a>
+         onclick="return confirm('Dzēst #<?= $oid ?>?')" class="action-btn danger">Dzēst</a>
     </div>
   </div>
 </div>
@@ -217,34 +267,73 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<!-- Delivery address modal -->
+<div id="deliveryModal" onclick="if(event.target===this)closeDelivery()">
+  <div id="deliveryBox">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:6px;">Atzīmēt kā pabeigtu</div>
+    <p style="font-size:13px;color:var(--grey);margin-bottom:18px;">Ievadiet piegādes adresi vai pakomāta kodu. Klientam tiks nosūtīts e-pasta paziņojums.</p>
+    <form method="POST" id="deliveryForm">
+      <input type="hidden" name="status_update" value="1">
+      <input type="hidden" name="status" value="pabeigts">
+      <input type="hidden" name="id" id="deliveryId">
+      <input type="hidden" name="filter" id="deliveryFilter">
+      <div style="margin-bottom:14px;">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:6px;">Piegādes adrese vai pakomāts</label>
+        <input type="text" name="piegades_adrese" id="deliveryAddr" class="form-input"
+          placeholder="Omniva Rīga Centrālā stacija / Raiņa iela 5, Rīga"
+          style="width:100%;box-sizing:border-box;">
+        <div style="font-size:11px;color:var(--grey2);margin-top:4px;">Neobligāts — atstājiet tukšu ja nosūtāt manuāli</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" onclick="closeDelivery()" class="action-btn">Atcelt</button>
+        <button type="submit" class="btn-primary" style="padding:8px 22px;">Apstiprināt un nosūtīt e-pastu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Lightbox -->
 <div id="admlx" onclick="if(event.target===this)admLxClose()">
-  <button id="admlx-close" onclick="admLxClose()">✕</button>
+  <button id="admlx-close" onclick="admLxClose()">&#10005;</button>
   <img id="admlx-img" src="" alt="">
   <div id="admlx-strip"></div>
   <div id="admlx-info"></div>
   <div id="admlx-btns">
-    <button class="lx-nav" onclick="admLxNav(-1)">‹</button>
-    <a class="lx-dl" id="admlx-dl" href="#" download>⬇ Lejupielādēt</a>
-    <button class="lx-nav" onclick="admLxNav(1)">›</button>
+    <button class="lx-nav" onclick="admLxNav(-1)">&#8249;</button>
+    <a class="lx-dl" id="admlx-dl" href="#" download>Lejupielādēt</a>
+    <button class="lx-nav" onclick="admLxNav(1)">&#8250;</button>
   </div>
 </div>
 
 <script>
+// Delivery modal
+function openDelivery(id, filter) {
+  document.getElementById('deliveryId').value = id;
+  document.getElementById('deliveryFilter').value = filter;
+  document.getElementById('deliveryAddr').value = '';
+  document.getElementById('deliveryModal').classList.add('open');
+  document.getElementById('deliveryAddr').focus();
+}
+function closeDelivery() {
+  document.getElementById('deliveryModal').classList.remove('open');
+}
+
+// Lightbox
 var _AP=[], _AC=0, _AT='';
 function admLxOpen(p,i,t){ _AP=p; _AT=t; document.getElementById('admlx').classList.add('open'); document.body.style.overflow='hidden'; admLxShow(i); }
 function admLxClose(){ document.getElementById('admlx').classList.remove('open'); document.body.style.overflow=''; }
 function admLxShow(i){
   if(i<0) i=_AP.length-1; if(i>=_AP.length) i=0; _AC=i;
-  document.getElementById('admlx-img').src = _AP[i];
-  document.getElementById('admlx-info').textContent = _AT + ' — ' + (i+1) + ' / ' + _AP.length;
-  var dl = document.getElementById('admlx-dl'); dl.href = _AP[i]; dl.download = 'lumina_foto_'+(i+1)+'.jpg';
-  document.getElementById('admlx-strip').innerHTML = _AP.map(function(p,j){
+  document.getElementById('admlx-img').src=_AP[i];
+  document.getElementById('admlx-info').textContent=_AT+' — '+(i+1)+' / '+_AP.length;
+  var dl=document.getElementById('admlx-dl'); dl.href=_AP[i]; dl.download='lumina_foto_'+(i+1)+'.jpg';
+  document.getElementById('admlx-strip').innerHTML=_AP.map(function(p,j){
     return '<img src="'+p+'" class="'+(j===i?'on':'')+'" onclick="admLxShow('+j+')" onerror="this.style.display=\'none\'">';
   }).join('');
 }
 function admLxNav(d){ admLxShow(_AC+d); }
 
+// Download all
 function admDlAll(photos, title) {
   if (!photos || !photos.length) return;
   if (!confirm('Lejupielādēt ' + photos.length + ' foto?')) return;
@@ -252,8 +341,7 @@ function admDlAll(photos, title) {
   var i = 0;
   function next() {
     if (i >= photos.length) return;
-    fetch(photos[i])
-      .then(function(r){ return r.blob(); })
+    fetch(photos[i]).then(function(r){ return r.blob(); })
       .then(function(blob){
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -261,16 +349,17 @@ function admDlAll(photos, title) {
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
         i++; setTimeout(next, 700);
-      })
-      .catch(function(){ window.open(photos[i],'_blank'); i++; setTimeout(next,400); });
+      }).catch(function(){ window.open(photos[i],'_blank'); i++; setTimeout(next,400); });
   }
   next();
 }
+
 document.addEventListener('keydown', function(e){
-  if (!document.getElementById('admlx').classList.contains('open')) return;
-  if (e.key==='ArrowLeft') admLxNav(-1);
-  else if (e.key==='ArrowRight') admLxNav(1);
-  else if (e.key==='Escape') admLxClose();
+  if (document.getElementById('admlx').classList.contains('open')) {
+    if (e.key==='ArrowLeft') admLxNav(-1);
+    else if (e.key==='ArrowRight') admLxNav(1);
+    else if (e.key==='Escape') admLxClose();
+  } else if (e.key==='Escape') closeDelivery();
 });
 </script>
 

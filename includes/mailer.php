@@ -308,3 +308,21 @@ function mailGalerijaViesis(string $epasts, string $vards, string $galNosaukums,
     . '<p style="color:#999;font-size:11px;text-align:center;margin-top:20px;">Ja nākotnē izveidosiet kontu ar šo e-pasta adresi, galerija tiks automātiski piesaistīta jūsu profilam.</p>';
   return luminaMail($epasts, $vards, 'Jūsu LUMINA galerija ir gatava — ' . $galNosaukums, $html);
 }
+
+// ── Foto pasūtījums pabeigts — klientam ─────────────────────────────────────
+function mailFotoPasutijumsPabeigts(string $epasts, string $vards, string $produkts, string $adrese = ''): bool {
+  $adreseHtml = $adrese
+    ? '<div style="margin:16px 0;padding:12px 16px;background:#f8f6f1;border-left:3px solid #B8975A;font-size:14px;"><strong>Piegādes adrese:</strong><br>' . htmlspecialchars($adrese) . '</div>'
+    : '';
+  $html = emailHeader('Jūsu pasūtījums ir ceļā!')
+    . emailGreeting($vards)
+    . '<p style="color:#555;line-height:1.7;margin:0 0 16px;">Priecājamies informēt, ka Jūsu foto pasūtījums ir sagatavots un nosūtīts!</p>'
+    . '<div style="background:#f8f6f1;border:1px solid #e8e3da;padding:14px 18px;margin:0 0 16px;border-radius:4px;">'
+    . '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Pasūtījums</div>'
+    . '<div style="font-size:17px;color:#1a1a1a;">' . htmlspecialchars($produkts) . '</div>'
+    . '</div>'
+    . $adreseHtml
+    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;">Ja Jums ir kādi jautājumi, droši sazinieties ar mums!</p>'
+    . emailBtn('mailto:katrinablazkova06@gmail.com', 'Sazināties ar fotogrāfi');
+  return luminaMail($epasts, $vards, 'Jūsu LUMINA foto pasūtījums ir nosūtīts — ' . $produkts, $html);
+}
