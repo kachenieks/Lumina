@@ -42,6 +42,27 @@ if (isset($_GET['action'])) {
 }
 
 // ── Pievienot foto pasūtījumu grozam (AJAX POST) ──────────
+// ── Batch upload endpoint — receives chunk of photos, saves, returns URLs ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_upload'])) {
+  header('Content-Type: application/json');
+  $uploadDir = __DIR__ . '/uploads/pasutijumi/';
+  if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+  $urls = [];
+  if (!empty($_FILES['fotos']['name'][0])) {
+    foreach ($_FILES['fotos']['tmp_name'] as $k => $tmp) {
+      if (!$tmp || !is_uploaded_file($tmp)) continue;
+      $ext = strtolower(pathinfo($_FILES['fotos']['name'][$k], PATHINFO_EXTENSION));
+      if (!in_array($ext, ['jpg','jpeg','png','webp'])) continue;
+      $fname = 'f_' . uniqid() . '.' . $ext;
+      if (move_uploaded_file($tmp, $uploadDir . $fname)) {
+        $urls[] = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/' . $fname;
+      }
+    }
+  }
+  echo json_encode(['ok' => true, 'urls' => $urls]);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart'])) {
   header('Content-Type: application/json');
   if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
@@ -74,7 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart']))
   if (!empty($_POST['gallery_urls'])) {
     $gals = json_decode($_POST['gallery_urls'], true) ?: [];
     foreach ($gals as $u) {
-      if (filter_var($u, FILTER_VALIDATE_URL)) $allFotoUrls[] = $u;
+      $u = trim($u);
+      if (!$u) continue;
+      // Accept full URLs (https://...) AND absolute paths (/4pt/...)
+      if (filter_var($u, FILTER_VALIDATE_URL) || str_starts_with($u, '/')) {
+        $allFotoUrls[] = $u;
+      }
     }
   }
 
@@ -499,7 +525,7 @@ if (isset($_SESSION['klients_id'])) {
           <?php if (!isset($_SESSION['klients_id'])): ?>
           <div style="margin-top:10px;">
             <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam)</label>
-            <input type="email" id="guestEmailField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="jusu@epasts.lv">
+            <input type="email" id="guestEmailField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="jusu@epasts.lv (neobligāts)">
           </div>
           <?php endif; ?>
           <div style="margin-top:10px;padding:11px;background:var(--cream2);">
