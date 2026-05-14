@@ -93,15 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_photo_to_cart']))
     echo json_encode(['error' => 'Nav pievienotu fotogrāfiju']); exit;
   }
 
-  // Check for duplicate: same product already in cart — overwrite instead of adding
-  $existingKey = null;
-  foreach ($_SESSION['cart'] as $k => $item) {
-    if (!empty($item['is_foto']) && ($item['name'] ?? '') === strip_tags($produktsName)) {
-      $existingKey = $k;
-      break;
-    }
-  }
-  $cartKey = $existingKey ?: ('foto_' . uniqid());
+  $cartKey = 'foto_' . uniqid();
   $_SESSION['cart'][$cartKey] = [
     'qty'        => 1,
     'name'       => strip_tags($produktsName),
@@ -503,15 +495,10 @@ if (isset($_SESSION['klients_id'])) {
         <div class="editor-step">
           <div class="editor-step-num" id="notesStepNum">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
-          <textarea id="orderNotes" class="form-textarea" style="height:55px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
-          <div style="margin-top:10px;">
-            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Piegādes adrese <span style="color:var(--gold);">*</span></label>
-            <input type="text" id="deliveryAddrField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="Omniva Rīga 1, vai ielas adrese" required>
-            <div style="font-size:10px;color:var(--grey2);margin-top:3px;">Omniva / DPD pakomāts vai mājas adrese</div>
-          </div>
+          <textarea id="orderNotes" class="form-textarea" style="height:65px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
           <?php if (!isset($_SESSION['klients_id'])): ?>
-          <div style="margin-top:8px;">
-            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam) <span style="color:var(--gold);">*</span></label>
+          <div style="margin-top:10px;">
+            <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam)</label>
             <input type="email" id="guestEmailField" class="form-input" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 12px;" placeholder="jusu@epasts.lv">
           </div>
           <?php endif; ?>
@@ -657,10 +644,6 @@ function openPhotoEditor(productId) {
   // Ensure all fields exist with safe defaults
   p = Object.assign({fotos:1, izmers:'', orient:'portrait', tips:'druka'}, p);
   editorProduct = p;
-
-  // Clear delivery address field for new product
-  const _da = document.getElementById('deliveryAddrField');
-  if (_da) { _da.value = ''; _da.style.borderColor = ''; }
 
   // Update topbar
   document.getElementById('editorProductName').textContent = p.title + (p.izmers ? ' · ' + p.izmers : '');
@@ -962,73 +945,57 @@ function checkEditorReady() {
 function addPhotoToCart() {
   if (!editorProduct || editorPhotos.length < editorProduct.fotos) return;
   const _da = document.getElementById('deliveryAddrField');
-  if (_da && !_da.value.trim()) { _da.focus(); _da.style.borderColor='var(--gold)'; showToast('Lūdzu ievadiet piegādes adresi', 'error'); return; }
-  const btn = document.getElementById('orderBtn');
-  const totalPhotos = editorPhotos.length;
-  btn.textContent = 'Augšupielādē ' + totalPhotos + ' foto...';
+  if (_da && !_da.value.trim()) {
+    _da.focus(); _da.style.borderColor='var(--gold)';
+    showToast('Lūdzu ievadiet piegādes adresi', 'error'); return;
+  }
+  const btn        = document.getElementById('orderBtn');
+  const produkts   = editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0);
+  const delivery   = (_da?.value||'').trim();
+  const notesRaw   = document.getElementById('orderNotes').value.trim();
+  const fullNotes  = [notesRaw, delivery ? 'Piegādes adrese: '+delivery : ''].filter(Boolean).join(' | ');
+  const guestEmail = document.getElementById('guestEmailField')?.value.trim()||'';
+  const galUrls    = editorPhotos.filter(p=>p.galleryUrl).map(p=>p.galleryUrl);
+  const localPhotos= editorPhotos.filter(p=>!p.galleryUrl && p.src.startsWith('data:'));
+  const BATCH      = 15; // stay well under max_file_uploads=20
+
   btn.disabled = true;
+  btn.textContent = localPhotos.length > 0 ? 'Saspiež '+localPhotos.length+' foto...' : 'Pievieno...';
 
-  // Compress all local photos client-side before upload
-  // (avoids PHP upload_max_filesize issues on shared/school servers)
-  const localPhotos = editorPhotos.filter(p => !p.galleryUrl && p.src.startsWith('data:'));
-  const galUrls2    = editorPhotos.filter(p => p.galleryUrl).map(p => p.galleryUrl);
-
-  btn.textContent = localPhotos.length > 0
-    ? 'Saspiež ' + localPhotos.length + ' foto...'
-    : 'Pievieno...';
-
-  // Compress all photos in parallel then upload
-  Promise.all(localPhotos.map(function(p) {
-    return compressImage(p.src, 1600, 1600, 0.82);
-  })).then(function(compressed) {
-    const fd2 = new FormData();
-    fd2.append('add_photo_to_cart', '1');
-    fd2.append('produkts', editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0));
-    fd2.append('cena', editorProduct.price);
-    const deliveryAddr = (document.getElementById('deliveryAddrField')?.value || '').trim();
-    const notesVal = document.getElementById('orderNotes').value.trim();
-    const fullNotes = [notesVal, deliveryAddr ? 'Piegādes adrese: ' + deliveryAddr : ''].filter(Boolean).join(' | ');
-    fd2.append('notes', fullNotes);
-    // Send guest email if not logged in
-    const guestEmailEl = document.getElementById('guestEmailField');
-    if (guestEmailEl && guestEmailEl.value.trim()) {
-      fd2.append('guest_email', guestEmailEl.value.trim());
-    }
-    if (galUrls2.length) fd2.append('gallery_urls', JSON.stringify(galUrls2));
-
-    compressed.forEach(function(dataUrl, i) {
-      fd2.append('fotos[]', dataURLtoBlob(dataUrl), 'foto_' + (i+1) + '.jpg');
-    });
-
-    btn.textContent = 'Augšupielādē...';
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/4pt/blazkova/lumina/Lumina/veikals.php');
-
-    xhr.upload.addEventListener('progress', function(e) {
-      if (e.lengthComputable) {
-        const pct = Math.round(e.loaded / e.total * 100);
-        btn.textContent = 'Augšupielādē... ' + pct + '%';
+  Promise.all(localPhotos.map(p => compressImage(p.src, 1600, 1600, 0.82)))
+    .then(async function(compressed) {
+      // Step 1: upload batches, collect server URLs
+      let allUrls = [...galUrls];
+      let done = 0;
+      for (let i = 0; i < compressed.length; i += BATCH) {
+        const batch = compressed.slice(i, i+BATCH);
+        const fd = new FormData();
+        fd.append('batch_upload', '1');
+        batch.forEach((d,j) => fd.append('fotos[]', dataURLtoBlob(d), 'f'+(done+j+1)+'.jpg'));
+        done += batch.length;
+        btn.textContent = 'Augšupielādē... '+Math.round(done/compressed.length*100)+'%';
+        try {
+          const r = await fetch('/4pt/blazkova/lumina/Lumina/veikals.php',{method:'POST',body:fd});
+          const d = await r.json();
+          if (d.urls) allUrls = allUrls.concat(d.urls);
+        } catch(e){ console.error('Batch',e); }
       }
+
+      // Step 2: save to cart session
+      btn.textContent = 'Pievieno...';
+      const fd2 = new FormData();
+      fd2.append('add_photo_to_cart','1');
+      fd2.append('produkts', produkts);
+      fd2.append('cena', editorProduct.price);
+      fd2.append('notes', fullNotes);
+      fd2.append('gallery_urls', JSON.stringify(allUrls));
+      if (guestEmail) fd2.append('guest_email', guestEmail);
+      try {
+        const r = await fetch('/4pt/blazkova/lumina/Lumina/veikals.php',{method:'POST',body:fd2});
+        handleCartResponse(await r.json());
+      } catch(e){ btn.textContent='Pievienot grozam →'; btn.disabled=false; showToast('Savienojuma kļūda','error'); }
     });
-
-    xhr.onload = function() {
-      let data;
-      try { data = JSON.parse(xhr.responseText); }
-      catch(e) { data = {ok: false, error: 'Servera kļūda'}; }
-      handleCartResponse(data);
-    };
-
-    xhr.onerror = function() {
-      btn.textContent = 'Pievienot grozam →';
-      btn.disabled = false;
-      showToast('Savienojuma kļūda. Mēģiniet vēlreiz.', 'error');
-    };
-
-    xhr.send(fd2);
-  });
 }
-
 function handleCartResponse(data) {
   const btn = document.getElementById('orderBtn');
   if (data.ok) {
@@ -1036,7 +1003,7 @@ function handleCartResponse(data) {
     closeModal('photoEditorModal');
     showToast((editorProduct ? editorProduct.title : 'Prece') + ' pievienots grozam ✓', 'success');
     // Reset editor state
-    editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0; editorProduct = null;
+    editorPhotos = []; currentPhotoIdx = 0; albumSpread = 0;
     document.querySelectorAll('.gal-pick').forEach(el => {
       el.style.borderColor = 'transparent';
       const chk = el.querySelector('.gal-pick-check');
@@ -1047,8 +1014,6 @@ function handleCartResponse(data) {
     if (thumbs) thumbs.innerHTML = '';
     const notes = document.getElementById('orderNotes');
     if (notes) notes.value = '';
-    const guestField = document.getElementById('guestEmailField');
-    if (guestField) guestField.value = '';
     if (typeof checkEditorReady === 'function') checkEditorReady();
     if (typeof updateEditorCount === 'function') updateEditorCount();
   } else {

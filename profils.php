@@ -160,167 +160,172 @@ $activeTab = $_GET['tab'] ?? 'rezervacijas';
     <!-- ── PASŪTĪJUMI ── -->
     <?php elseif ($activeTab === 'pasutijumi'): ?>
     <?php
-    $pasutijumi = [];
+    $pasutijumi    = [];
     $klientsEpasts = escape($savienojums, $_SESSION['klients_epasts'] ?? '');
     $pRes = mysqli_query($savienojums,
       "SELECT * FROM pasutijumi
        WHERE klienta_id=$klientsId
-          OR (klienta_id=0 AND viesis_epasts='$klientsEpasts' AND '$klientsEpasts' != '')
-       ORDER BY izveidots DESC"
-    );
+          OR (klienta_id=0 AND viesis_epasts='$klientsEpasts' AND '$klientsEpasts'!='')
+       ORDER BY izveidots DESC");
     while ($p = mysqli_fetch_assoc($pRes)) $pasutijumi[] = $p;
 
     function getProfFotos(array $p): array {
       $base = '/4pt/blazkova/lumina/Lumina/uploads/pasutijumi/';
-      $photos = [];
+      $out  = [];
       if (!empty($p['foto_urls'])) {
-        $raw = $p['foto_urls'];
-        $arr = json_decode($raw, true);
+        $arr = json_decode($p['foto_urls'], true);
         if (is_array($arr)) {
           foreach ($arr as $u) {
-            $u = trim($u); if ($u === '') continue;
-            $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+            $u = trim($u); if (!$u) continue;
+            $out[] = (filter_var($u,FILTER_VALIDATE_URL)||str_starts_with($u,'/')) ? $u : $base.basename($u);
           }
-        } else {
-          $u = trim($raw);
-          if ($u !== '') $photos[] = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . basename($u);
+        } elseif (trim($p['foto_urls'])) {
+          $u = trim($p['foto_urls']);
+          $out[] = (filter_var($u,FILTER_VALIDATE_URL)||str_starts_with($u,'/')) ? $u : $base.$u;
         }
       }
       if (!empty($p['foto_fails'])) {
-        $u = trim($p['foto_fails']);
-        $res = filter_var($u, FILTER_VALIDATE_URL) ? $u : $base . $u;
-        if (!in_array($res, $photos)) $photos[] = $res;
+        $u  = trim($p['foto_fails']);
+        $r2 = (filter_var($u,FILTER_VALIDATE_URL)||str_starts_with($u,'/')) ? $u : $base.$u;
+        if (!in_array($r2,$out)) $out[] = $r2;
       }
-      return array_values(array_unique(array_filter($photos)));
+      return array_values(array_unique(array_filter($out)));
     }
     ?>
     <style>
     .prl-card{background:var(--white);border:1px solid var(--grey3);display:flex;gap:0;overflow:hidden;margin-bottom:14px;transition:box-shadow .2s;}
     .prl-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);}
-    .prl-photos{flex-shrink:0;width:130px;display:flex;flex-direction:column;gap:2px;background:var(--cream2);overflow:hidden;}
-    .prl-main-img{width:130px;height:130px;object-fit:cover;display:block;cursor:pointer;transition:opacity .2s;}
-    .prl-main-img:hover{opacity:.85;}
-    .prl-thumbs{display:flex;gap:2px;padding:2px;}
-    .prl-thumb{width:40px;height:40px;object-fit:cover;cursor:pointer;transition:.15s;flex-shrink:0;}
+    .prl-photos{flex-shrink:0;width:140px;display:flex;flex-direction:column;gap:0;background:var(--cream2);overflow:hidden;}
+    .prl-main{width:140px;height:120px;object-fit:cover;display:block;cursor:pointer;transition:opacity .2s;}
+    .prl-main:hover{opacity:.85;}
+    .prl-thumbs{display:flex;gap:2px;padding:2px;background:var(--cream2);}
+    .prl-thumb{width:42px;height:42px;object-fit:cover;cursor:pointer;transition:.15s;flex-shrink:0;}
     .prl-thumb:hover{opacity:.75;transform:scale(1.06);}
-    .prl-more{width:40px;height:40px;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;cursor:pointer;flex-shrink:0;font-weight:600;}
-    #plx{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;align-items:center;justify-content:center;flex-direction:column;}
-    #plx.open{display:flex;}
-    #plx img.main{max-width:90vw;max-height:78vh;object-fit:contain;border:1px solid rgba(255,255,255,.08);}
-    #plx-strip{display:flex;gap:6px;margin-top:12px;overflow-x:auto;max-width:90vw;padding-bottom:4px;}
-    #plx-strip img{width:56px;height:56px;object-fit:cover;cursor:pointer;opacity:.4;border:2px solid transparent;transition:.15s;flex-shrink:0;}
-    #plx-strip img.active{opacity:1;border-color:#B8975A;}
-    #plx-info{color:rgba(255,255,255,.45);font-size:11px;margin-top:8px;letter-spacing:1px;}
-    #plx-close{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;opacity:.7;line-height:1;}
-    #plx-close:hover{opacity:1;}
-    #plx-btns{display:flex;gap:10px;margin-top:14px;align-items:center;}
-    .plx-nav{background:none;border:1px solid rgba(255,255,255,.25);color:#fff;padding:7px 22px;cursor:pointer;font-size:18px;transition:.15s;}
-    .plx-nav:hover{background:#B8975A;border-color:#B8975A;}
-    .plx-dl{padding:8px 22px;background:#B8975A;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;}
+    .prl-more{width:42px;height:42px;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;cursor:pointer;flex-shrink:0;font-weight:600;}
+    /* Client lightbox */
+    #clx{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:9999;flex-direction:column;align-items:center;justify-content:center;}
+    #clx.open{display:flex;}
+    #clx img.mi{max-width:90vw;max-height:78vh;object-fit:contain;}
+    #clxStrip{display:flex;gap:5px;margin-top:12px;overflow-x:auto;max-width:90vw;padding-bottom:4px;}
+    #clxStrip img{width:56px;height:56px;object-fit:cover;cursor:pointer;opacity:.4;border:2px solid transparent;transition:.15s;flex-shrink:0;}
+    #clxStrip img.on{opacity:1;border-color:#B8975A;}
+    #clxInfo{color:rgba(255,255,255,.4);font-size:11px;margin-top:8px;letter-spacing:1px;}
+    #clxClose{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;padding:4px 8px;line-height:1;}
+    #clxBtns{display:flex;gap:10px;margin-top:14px;}
+    .clxNav{background:none;border:1px solid rgba(255,255,255,.25);color:#fff;padding:7px 22px;cursor:pointer;font-size:18px;}
+    .clxNav:hover{background:#B8975A;border-color:#B8975A;}
+    .clxDl{padding:9px 22px;background:#B8975A;color:#fff;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;}
     </style>
 
     <div>
       <?php if (empty($pasutijumi)): ?>
       <div style="text-align:center;padding:60px;color:var(--grey);">
-        <div style="font-size:40px;opacity:.3;margin-bottom:16px;">&#128717;</div>
-        <p>Jums v&#275;l nav pas&#363;t&#299;jumu.</p>
-        <a href="/4pt/blazkova/lumina/Lumina/veikals.php" class="btn-primary" style="display:inline-block;margin-top:20px;">Uz veikalu &rarr;</a>
+        <p>Jums vēl nav pasūtījumu.</p>
+        <a href="/4pt/blazkova/lumina/Lumina/veikals.php" class="btn-primary" style="display:inline-block;margin-top:20px;">Uz veikalu</a>
       </div>
       <?php else: ?>
-      <?php foreach ($pasutijumi as $p):
-        $sc = ['jauns'=>'#e67e22','apstiprinats'=>'#27ae60','pabeigts'=>'#2980b9','atcelts'=>'#c0392b','apmaksats'=>'#8e44ad'];
-        $sl = $p['statuss'] ?? 'jauns';
-        $sl_label = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprin&#257;ts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaks&#257;ts'];
+      <?php
+      $sc = ['jauns'=>'#e67e22','apstiprinats'=>'#27ae60','pabeigts'=>'#2980b9','atcelts'=>'#c0392b','apmaksats'=>'#8e44ad'];
+      $sl_lbl = ['jauns'=>'Jauns','apstiprinats'=>'Apstiprināts','pabeigts'=>'Pabeigts','atcelts'=>'Atcelts','apmaksats'=>'Apmaksāts'];
+      foreach ($pasutijumi as $p):
+        $sl     = $p['statuss'] ?? 'jauns';
         $photos = getProfFotos($p);
-        $pc = count($photos);
-        $photosDataAttr = htmlspecialchars(json_encode($photos, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES);
-        $titleDataAttr  = htmlspecialchars($p['produkts'] ?? '', ENT_QUOTES);
+        $pc     = count($photos);
+        // Safe data attributes
+        $pda = htmlspecialchars(json_encode($photos, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES);
       ?>
-      <div class="prl-card" data-photos="<?= $photosDataAttr ?>" data-title="<?= $titleDataAttr ?>">
+      <div class="prl-card" data-photos="<?= $pda ?>">
+        <!-- Photos column -->
         <div class="prl-photos">
           <?php if ($pc > 0): ?>
-          <img src="<?= htmlspecialchars($photos[0]) ?>" class="prl-main-img" alt=""
-            onclick="profPlxOpen(this)"
-            onerror="this.style.background='var(--cream2)';this.style.display='none'">
+          <img src="<?= htmlspecialchars($photos[0]) ?>" class="prl-main" alt=""
+            onclick="clxOpen(this.closest('[data-photos]'),0)"
+            onerror="this.style.display='none'">
           <?php if ($pc > 1): ?>
           <div class="prl-thumbs">
-            <?php for($ti=1;$ti<=min(2,$pc-1);$ti++): ?>
-            <img src="<?= htmlspecialchars($photos[$ti]) ?>" class="prl-thumb" data-idx="<?= $ti ?>"
-              onclick="profPlxOpen(this, <?= $ti ?>)"
+            <?php for ($ti=1; $ti <= min(2, $pc-1); $ti++): ?>
+            <img src="<?= htmlspecialchars($photos[$ti]) ?>" class="prl-thumb" alt=""
+              onclick="clxOpen(this.closest('[data-photos]'),<?= $ti ?>)"
               onerror="this.style.display='none'">
             <?php endfor; ?>
-            <?php if($pc>3): ?>
-            <div class="prl-more" onclick="profPlxOpen(this, 3)">+<?= $pc-3 ?></div>
+            <?php if ($pc > 3): ?>
+            <div class="prl-more" onclick="clxOpen(this.closest('[data-photos]'),3)">+<?= $pc-3 ?></div>
             <?php endif; ?>
           </div>
           <?php endif; ?>
           <?php else: ?>
-          <div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:.18;">&#128247;</div>
+          <div style="width:140px;height:120px;display:flex;align-items:center;justify-content:center;font-size:32px;opacity:.18;">&#128247;</div>
           <?php endif; ?>
         </div>
-        <div style="padding:16px 20px;flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
-            <div style="font-family:'Cormorant Garamond',serif;font-size:19px;color:var(--ink);"><?= htmlspecialchars($p['produkts']) ?></div>
-            <span style="font-size:9px;padding:4px 10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:<?= ($sc[$sl]??'#999') ?>18;color:<?= $sc[$sl]??'#999' ?>;flex-shrink:0;"><?= $sl_label[$sl]??ucfirst($sl) ?></span>
+        <!-- Info column -->
+        <div style="padding:14px 18px;flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--ink);"><?= htmlspecialchars($p['produkts']) ?></div>
+            <span style="font-size:9px;padding:3px 9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:<?= ($sc[$sl]??'#999') ?>18;color:<?= $sc[$sl]??'#999' ?>;flex-shrink:0;border-radius:20px;"><?= $sl_lbl[$sl]??ucfirst($sl) ?></span>
           </div>
-          <?php if($pc>0): ?>
-          <div style="font-size:11px;color:var(--grey);margin-bottom:6px;">
-            <?= $pc ?> foto &middot; <span style="color:var(--gold);cursor:pointer;" onclick="profPlxOpen(this, 0)">Skat&#299;t visu &rarr;</span>
+          <?php if ($pc > 0): ?>
+          <div style="font-size:11px;color:var(--grey);margin-bottom:5px;">
+            <?= $pc ?> foto &middot;
+            <span style="color:var(--gold);cursor:pointer;" onclick="clxOpen(this.closest('[data-photos]'),0)">Skatīt visu &rarr;</span>
           </div>
           <?php endif; ?>
-          <?php if(!empty($p['papildu_info'])): ?>
-          <div style="font-size:12px;color:var(--grey);margin-top:4px;"><?= htmlspecialchars($p['papildu_info']) ?></div>
+          <?php
+          // Show delivery address and tracking from notes
+          $notes = $p['papildu_info'] ?? '';
+          preg_match('/Pieg[aā]des adrese:\s*([^\n|]+)/u', $notes, $ma);
+          preg_match('/Izseko[sš]anas kods:\s*([^\n]+)/u', $notes, $mb);
+          $cAddr = trim($ma[1] ?? '');
+          $track = trim($mb[1] ?? '');
+          if ($cAddr):
+          ?>
+          <div style="font-size:11px;color:var(--grey);margin-bottom:2px;">Piegāde: <?= htmlspecialchars($cAddr) ?></div>
           <?php endif; ?>
-          <div style="font-size:11px;color:var(--grey2);margin-top:10px;"><?= date('d.m.Y H:i',strtotime($p['izveidots'])) ?></div>
+          <?php if ($track): ?>
+          <div style="font-size:11px;color:#27ae60;margin-bottom:2px;">Kods: <strong style="font-family:monospace;"><?= htmlspecialchars($track) ?></strong></div>
+          <?php endif; ?>
+          <div style="font-size:11px;color:var(--grey2);margin-top:8px;"><?= date('d.m.Y H:i', strtotime($p['izveidots'])) ?></div>
         </div>
       </div>
       <?php endforeach; ?>
       <?php endif; ?>
     </div>
 
-    <!-- Lightbox -->
-    <div id="plx" onclick="if(event.target===this)plxClose()">
-      <button id="plx-close" onclick="plxClose()">&#10005;</button>
-      <img class="main" id="plx-img" src="" alt="">
-      <div id="plx-strip"></div>
-      <div id="plx-info"></div>
-      <div id="plx-btns">
-        <button class="plx-nav" onclick="plxNav(-1)">&#8249;</button>
-        <a class="plx-dl" id="plx-dl" href="#" download>&#11015; Lej.l&#257;d&#275;t</a>
-        <button class="plx-nav" onclick="plxNav(1)">&#8250;</button>
+    <!-- Client lightbox -->
+    <div id="clx" onclick="if(event.target===this)clxClose()">
+      <button id="clxClose" onclick="clxClose()">&#10005;</button>
+      <img class="mi" id="clxImg" src="" alt="">
+      <div id="clxStrip"></div>
+      <div id="clxInfo"></div>
+      <div id="clxBtns">
+        <button class="clxNav" onclick="clxNav(-1)">&#8249;</button>
+        <a class="clxDl" id="clxDl" href="#" download>&#11015; Lejupielādēt</a>
+        <button class="clxNav" onclick="clxNav(1)">&#8250;</button>
       </div>
     </div>
     <script>
-    var _P=[],_C=0,_T='';
-
-    // Find parent card's data-photos attribute
-    function profPlxOpen(el, idx) {
-      idx = idx || 0;
-      var card = el.closest('[data-photos]');
-      if (!card) return;
-      var photos = JSON.parse(card.dataset.photos);
-      var title  = card.dataset.title || '';
-      _P=photos; _T=title;
-      document.getElementById('plx').classList.add('open');
+    var _cP=[],_cC=0;
+    function clxOpen(card,i){
+      _cP=JSON.parse(card.dataset.photos);
+      document.getElementById('clx').classList.add('open');
       document.body.style.overflow='hidden';
-      _plxS(idx);
+      clxShow(i);
     }
-    function plxClose(){document.getElementById('plx').classList.remove('open');document.body.style.overflow='';}
-    function _plxS(i){
-      if(i<0)i=_P.length-1;if(i>=_P.length)i=0;_C=i;
-      var im=document.getElementById('plx-img');im.src=_P[i];
-      document.getElementById('plx-info').textContent=_T+' — '+(i+1)+' / '+_P.length;
-      var dl=document.getElementById('plx-dl');dl.href=_P[i];dl.download='lumina_foto_'+(i+1)+'.jpg';
-      document.getElementById('plx-strip').innerHTML=_P.map(function(p,j){
-        return '<img src="'+p+'" class="'+(j===i?'active':'')+'" onclick="_plxS('+j+')" onerror="this.style.display='none'">';
+    function clxClose(){document.getElementById('clx').classList.remove('open');document.body.style.overflow='';}
+    function clxShow(i){
+      if(i<0)i=_cP.length-1;if(i>=_cP.length)i=0;_cC=i;
+      document.getElementById('clxImg').src=_cP[i];
+      document.getElementById('clxInfo').textContent=(i+1)+' / '+_cP.length;
+      var dl=document.getElementById('clxDl');dl.href=_cP[i];dl.download='lumina_foto_'+(i+1)+'.jpg';
+      document.getElementById('clxStrip').innerHTML=_cP.map(function(p,j){
+        return '<img src="'+p+'" class="'+(j===i?'on':'')+'" onclick="clxShow('+j+')" onerror="this.style.display=\'none\'">';
       }).join('');
     }
-    function plxNav(d){_plxS(_C+d);}
+    function clxNav(d){clxShow(_cC+d);}
     document.addEventListener('keydown',function(e){
-      if(!document.getElementById('plx').classList.contains('open'))return;
-      if(e.key==='ArrowLeft')plxNav(-1);
-      else if(e.key==='ArrowRight')plxNav(1);
-      else if(e.key==='Escape')plxClose();
+      if(!document.getElementById('clx').classList.contains('open'))return;
+      if(e.key==='ArrowLeft')clxNav(-1);
+      else if(e.key==='ArrowRight')clxNav(1);
+      else if(e.key==='Escape')clxClose();
     });
     </script>
     <!-- ── GALERIJAS ── -->
