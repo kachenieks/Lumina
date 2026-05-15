@@ -310,23 +310,22 @@ function mailGalerijaViesis(string $epasts, string $vards, string $galNosaukums,
 }
 
 // ── Foto pasūtījums pabeigts — klientam aiziet e-pasts ar izsekošanas kodu ──
-function mailFotoPasutijumsPabeigts(string $epasts, string $vards, string $produkts, string $tracking = '', string $carrier = ''): bool {
-  $carrierName = $carrier === 'dpd' ? 'DPD' : 'Omniva';
-  $trackHtml = $tracking
-    ? '<div style="margin:20px 0;padding:16px 20px;background:#f8f6f1;border:2px solid #B8975A;border-radius:4px;text-align:center;">'
-      . '<div style="font-size:10px;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">' . $carrierName . ' izsekošanas kods</div>'
-      . '<div style="font-size:24px;font-weight:700;color:#1a1a1a;letter-spacing:3px;font-family:monospace;">' . htmlspecialchars($tracking) . '</div>'
+function mailFotoPasutijumsPabeigts(string $epasts, string $vards, string $produkts, string $tracking = ''): bool {
+  $trackBlock = $tracking
+    ? '<div style="margin:24px 0;padding:20px;background:#FAF8F4;border:2px solid #B8975A;border-radius:4px;text-align:center;">'
+      . '<div style="font-size:10px;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Izsekošanas kods</div>'
+      . '<div style="font-size:26px;font-weight:700;color:#1a1a1a;letter-spacing:4px;font-family:monospace;">' . htmlspecialchars($tracking) . '</div>'
       . '</div>'
     : '';
-  $html = emailHeader('Jūsu pasūtījums ir ceļā!')
-    . emailGreeting($vards)
-    . '<p style="color:#555;line-height:1.7;margin:0 0 16px;">Jūsu foto pasūtījums ir sagatavots un nosūtīts!</p>'
-    . '<div style="background:#f8f6f1;border:1px solid #e8e3da;padding:14px 18px;margin:0 0 16px;border-radius:4px;">'
-    . '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Pasūtījums</div>'
+  $content = '<h2 style="font-family:Georgia,serif;font-size:22px;color:#1a1a1a;margin:0 0 16px;font-weight:400;">Jūsu pasūtījums ir ceļā! 📦</h2>'
+    . '<p style="margin:0 0 16px;">Labdien, ' . htmlspecialchars($vards) . '!</p>'
+    . '<p style="margin:0 0 20px;">Jūsu foto pasūtījums ir sagatavots un nosūtīts uz Jūsu norādīto adresi.</p>'
+    . '<div style="background:#FAF8F4;border:1px solid #e8e3da;padding:14px 18px;margin:0 0 16px;border-radius:4px;">'
+    . '<div style="font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Pasūtījums</div>'
     . '<div style="font-size:17px;color:#1a1a1a;">' . htmlspecialchars($produkts) . '</div>'
     . '</div>'
-    . $trackHtml
-    . '<p style="color:#555;line-height:1.7;margin:0 0 20px;">Ja Jums ir jautājumi par piegādi, sazinieties ar mums!</p>'
+    . $trackBlock
+    . '<p style="margin:16px 0 0;color:#777;">Ja Jums ir jautājumi par piegādi, droši sazinieties ar mums!</p>'
     . emailBtn('mailto:katrinablazkova06@gmail.com', 'Sazināties ar fotogrāfi');
-  return luminaMail($epasts, $vards, 'Jūsu LUMINA pasūtījums ir nosūtīts — ' . $produkts, $html);
+  return luminaMail($epasts, $vards, 'Jūsu LUMINA pasūtījums ir nosūtīts — ' . $produkts, $content);
 }

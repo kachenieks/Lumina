@@ -13,30 +13,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_status'])) {
   $status = in_array($_POST['status'], ['jauns','apstiprinats','pabeigts','atcelts']) ? $_POST['status'] : 'jauns';
   mysqli_query($savienojums, "UPDATE pasutijumi SET statuss='$status' WHERE id=$id");
 
-  // On pabeigts: save tracking + carrier, send email
+  // On pabeigts: save tracking code + send email to client
   if ($status === 'pabeigts') {
     $tracking = strtoupper(trim($_POST['tracking'] ?? ''));
-    $carrier  = in_array($_POST['carrier'] ?? '', ['omniva','dpd']) ? $_POST['carrier'] : 'omniva';
-    // Append to notes
-    $ord = mysqli_fetch_assoc(mysqli_query($savienojums,
-      "SELECT papildu_info FROM pasutijumi WHERE id=$id"));
-    $existNote = trim($ord['papildu_info'] ?? '');
-    $addNote = '';
-    if ($tracking) $addNote = "\nIzsekošanas kods: $tracking";
-    $newNote = $existNote . $addNote;
-    $noteEsc = escape($savienojums, $newNote);
-    mysqli_query($savienojums, "UPDATE pasutijumi SET papildu_info='$noteEsc' WHERE id=$id");
-    // Send email
-    $ord2  = mysqli_fetch_assoc(mysqli_query($savienojums,
-      "SELECT p.*, k.vards, k.uzvards, k.epasts FROM pasutijumi p
-       LEFT JOIN klienti k ON p.klienta_id=k.id AND p.klienta_id>0 WHERE p.id=$id"));
-    $to    = $ord2['epasts'] ?: ($ord2['viesis_epasts'] ?? '');
-    $vards = $ord2['vards'] ? $ord2['vards'].' '.($ord2['uzvards']??'') : 'Klients';
+    // Append tracking to notes
+    if ($tracking) {
+      $ord = mysqli_fetch_assoc(mysqli_query($savienojums,
+        "SELECT papildu_info FROM pasutijumi WHERE id=$id"));
+      $existNote = trim($ord['papildu_info'] ?? '');
+      $newNote   = $existNote . "\nIzsekošanas kods: $tracking";
+      $noteEsc   = escape($savienojums, $newNote);
+      mysqli_query($savienojums, "UPDATE pasutijumi SET papildu_info='$noteEsc' WHERE id=$id");
+    }
+    // Get client email — try registered client first, then viesis_epasts
+    $ord2 = mysqli_fetch_assoc(mysqli_query($savienojums,
+      "SELECT p.produkts, p.viesis_epasts, k.vards, k.uzvards, k.epasts
+       FROM pasutijumi p
+       LEFT JOIN klienti k ON p.klienta_id=k.id AND p.klienta_id>0
+       WHERE p.id=$id"));
+    $to    = ($ord2['epasts'] ?? '') ?: ($ord2['viesis_epasts'] ?? '');
+    $vards = !empty($ord2['vards']) ? $ord2['vards'].' '.($ord2['uzvards']??'') : 'Klients';
     if ($to) {
       try {
         require_once __DIR__ . '/../includes/mailer.php';
-        mailFotoPasutijumsPabeigts($to, $vards, $ord2['produkts'], $tracking, $carrier);
-      } catch (\Throwable $e) { error_log('Mail: '.$e->getMessage()); }
+        mailFotoPasutijumsPabeigts($to, $vards, $ord2['produkts'], $tracking);
+      } catch (\Throwable $e) { error_log('Mailer kļūda: '.$e->getMessage()); }
     }
   }
 
@@ -266,7 +267,7 @@ include __DIR__ . '/includes/header.php';
       <?php endif; ?>
       <?php if (!in_array($sl, ['pabeigts','atcelts'])): ?>
       <button class="action-btn"
-        onclick="dmOpen(<?= $oid ?>, '<?= htmlspecialchars($filter) ?>', '<?= htmlspecialchars(addslashes($clientAddr)) ?>')">Pabeigts</button>
+        onclick="dmOpen(<?= $oid ?>, '<?= htmlspecialchars($filter) ?>')">Pabeigts</button>
       <?php endif; ?>
       <?php if ($sl !== 'atcelts'): ?>
       <form method="POST" style="display:inline;">
@@ -290,49 +291,20 @@ include __DIR__ . '/includes/header.php';
 <div id="dmWrap" onclick="if(event.target===this)dmClose()">
   <div id="dmBox">
     <div style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:4px;">Atzīmēt kā pabeigtu</div>
-    <p style="font-size:13px;color:var(--grey);margin-bottom:18px;">Izvēlieties piegādes pakalpojumu, pārbaudiet klienta adresi un ievadiet izsekošanas kodu.</p>
+    <p style="font-size:13px;color:var(--grey);margin-bottom:18px;">Ievadiet izsekošanas kodu — klientam aizies e-pasts.</p>
     <form method="POST" id="dmForm" onsubmit="return dmValidate()">
       <input type="hidden" name="do_status" value="1">
       <input type="hidden" name="status" value="pabeigts">
       <input type="hidden" name="id" id="dmId">
       <input type="hidden" name="filter" id="dmFilter">
 
-      <!-- Carrier selector -->
-      <div style="margin-bottom:16px;">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--grey);margin-bottom:8px;">Piegādes pakalpojums <span style="color:#c0392b;">*</span></div>
-        <div style="display:flex;gap:10px;">
-          <label style="flex:1;cursor:pointer;">
-            <input type="radio" name="carrier" value="omniva" id="carrierOmniva" checked style="display:none;">
-            <div id="lbOmniva" style="border:2px solid var(--gold);background:#faf8f4;padding:12px;border-radius:6px;text-align:center;transition:.15s;">
-              <div style="font-weight:600;font-size:14px;color:var(--ink);">Omniva</div>
-              <div style="font-size:11px;color:var(--grey);">Pakomāts</div>
-            </div>
-          </label>
-          <label style="flex:1;cursor:pointer;">
-            <input type="radio" name="carrier" value="dpd" id="carrierDpd" style="display:none;">
-            <div id="lbDpd" style="border:2px solid var(--grey3);background:var(--cream2);padding:12px;border-radius:6px;text-align:center;transition:.15s;">
-              <div style="font-weight:600;font-size:14px;color:var(--ink);">DPD</div>
-              <div style="font-size:11px;color:var(--grey);">Pakomāts / Kurjers</div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Client address display -->
-      <div style="margin-bottom:14px;">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--grey);margin-bottom:6px;">Klienta norādītā adrese <span style="color:#c0392b;">*</span></div>
-        <div id="dmClientAddr" style="background:var(--cream2);padding:10px 12px;font-size:13px;border-radius:4px;min-height:36px;color:var(--ink);border:1px solid var(--grey3);"></div>
-        <div id="dmAddrWarn" style="display:none;font-size:11px;color:#c0392b;margin-top:4px;">Klients nav norādījis adresi — pārbaudiet pasūtījuma piezīmes vai sazinieties ar klientu.</div>
-      </div>
-
-      <!-- Tracking code -->
       <div style="margin-bottom:18px;">
-        <label for="dmTracking" style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--grey);display:block;margin-bottom:6px;">Izsekošanas kods <span style="color:#c0392b;">*</span></label>
+        <label for="dmTracking" style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--grey);display:block;margin-bottom:8px;">Izsekošanas kods <span style="color:#c0392b;">*</span></label>
         <input type="text" name="tracking" id="dmTracking" class="form-input"
           placeholder="LV123456789EE"
-          style="width:100%;box-sizing:border-box;font-family:monospace;font-size:15px;letter-spacing:3px;text-transform:uppercase;"
+          style="width:100%;box-sizing:border-box;font-family:monospace;font-size:17px;letter-spacing:4px;text-transform:uppercase;padding:12px;"
           oninput="this.value=this.value.toUpperCase()">
-        <div style="font-size:11px;color:var(--grey2);margin-top:4px;">Kods tiks iekļauts e-pastā klientam</div>
+        <div style="font-size:11px;color:var(--grey2);margin-top:4px;">Omniva vai DPD kods — tiks iekļauts e-pastā klientam</div>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -358,16 +330,10 @@ include __DIR__ . '/includes/header.php';
 
 <script>
 /* ── Delivery modal ── */
-function dmOpen(id, filter, clientAddr) {
+function dmOpen(id, filter) {
   document.getElementById('dmId').value       = id;
   document.getElementById('dmFilter').value   = filter;
   document.getElementById('dmTracking').value = '';
-  var hasAddr = clientAddr && clientAddr.trim() && clientAddr !== 'Nav norādīta';
-  document.getElementById('dmClientAddr').textContent = hasAddr ? clientAddr : '(Nav norādīta)';
-  document.getElementById('dmAddrWarn').style.display = hasAddr ? 'none' : 'block';
-  // Reset carrier to Omniva
-  document.getElementById('carrierOmniva').checked = true;
-  dmCarrierStyle();
   document.getElementById('dmWrap').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(function(){ document.getElementById('dmTracking').focus(); }, 150);
@@ -376,16 +342,6 @@ function dmClose() {
   document.getElementById('dmWrap').classList.remove('open');
   document.body.style.overflow = '';
 }
-function dmCarrierStyle() {
-  var omn = document.getElementById('carrierOmniva').checked;
-  document.getElementById('lbOmniva').style.borderColor = omn ? 'var(--gold)' : 'var(--grey3)';
-  document.getElementById('lbOmniva').style.background  = omn ? '#faf8f4' : 'var(--cream2)';
-  document.getElementById('lbDpd').style.borderColor    = omn ? 'var(--grey3)' : 'var(--gold)';
-  document.getElementById('lbDpd').style.background     = omn ? 'var(--cream2)' : '#faf8f4';
-}
-document.addEventListener('change', function(e){
-  if (e.target.name === 'carrier') dmCarrierStyle();
-});
 function dmValidate() {
   var track = document.getElementById('dmTracking').value.trim();
   if (!track) {

@@ -521,7 +521,28 @@ if (isset($_SESSION['klients_id'])) {
         <div class="editor-step">
           <div class="editor-step-num" id="notesStepNum">03</div>
           <div class="editor-step-title">Papildu vēlmes</div>
-          <textarea id="orderNotes" class="form-textarea" style="height:65px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
+          <textarea id="orderNotes" class="form-textarea" style="height:55px;width:100%;box-sizing:border-box;font-size:12px;resize:none;" placeholder="Melnbalta versija, īpašas piezīmes..."></textarea>
+          <!-- Piegāde -->
+          <div style="margin-top:11px;">
+            <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);margin-bottom:7px;">Piegāde <span style="color:var(--gold);">*</span></div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <label style="flex:1;cursor:pointer;">
+                <input type="radio" name="delivery_carrier" value="omniva" id="dc_omniva" checked style="display:none;">
+                <div id="dcb_omniva" style="border:1.5px solid var(--gold);background:var(--cream2);padding:8px 4px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:var(--ink);transition:.15s;cursor:pointer;">Omniva</div>
+              </label>
+              <label style="flex:1;cursor:pointer;">
+                <input type="radio" name="delivery_carrier" value="dpd" id="dc_dpd" style="display:none;">
+                <div id="dcb_dpd" style="border:1.5px solid var(--grey3);background:transparent;padding:8px 4px;border-radius:4px;text-align:center;font-size:12px;font-weight:600;color:var(--grey);transition:.15s;cursor:pointer;">DPD</div>
+              </label>
+            </div>
+            <div style="position:relative;">
+              <input type="text" id="deliveryAddrField" class="form-input" autocomplete="off"
+                style="width:100%;box-sizing:border-box;font-size:12px;padding:8px 10px;"
+                placeholder="Sāc rakstīt pakomāta nosaukumu vai pilsētu...">
+              <div id="daDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--grey3);border-top:none;max-height:160px;overflow-y:auto;z-index:99;box-shadow:0 4px 16px rgba(0,0,0,.12);"></div>
+            </div>
+            <div id="daHint" style="font-size:10px;color:var(--grey2);margin-top:3px;">Omniva — raksti pilsētu vai nosaukumu</div>
+          </div>
           <?php if (!isset($_SESSION['klients_id'])): ?>
           <div style="margin-top:10px;">
             <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--grey);display:block;margin-bottom:4px;">Jūsu e-pasts (apstiprinājumam)</label>
@@ -968,18 +989,99 @@ function checkEditorReady() {
 }
 
 // ── SUBMIT ────────────────────────────────────────────
+/* ── Omniva / DPD pakomāti ── */
+var _omnivaAll = [];
+var _dpdAll = [
+  {name:'DPD Pickup Rīga Centrālā',city:'Rīga',addr:'Brīvības iela 50'},
+  {name:'DPD Pickup Rīga Purvciems',city:'Rīga',addr:'Stirnu iela 8'},
+  {name:'DPD Pickup Rīga Imanta',city:'Rīga',addr:'Imanta 3. līnija 1'},
+  {name:'DPD Pickup Rīga Teika',city:'Rīga',addr:'Ģertrūdes iela 33'},
+  {name:'DPD Pickup Jūrmala',city:'Jūrmala',addr:'Jomas iela 35'},
+  {name:'DPD Pickup Jelgava',city:'Jelgava',addr:'Akadēmijas iela 18'},
+  {name:'DPD Pickup Liepāja',city:'Liepāja',addr:'Graudu iela 27'},
+  {name:'DPD Pickup Valmiera',city:'Valmiera',addr:'Rīgas iela 27'},
+  {name:'DPD Pickup Daugavpils',city:'Daugavpils',addr:'Vienības iela 8'},
+  {name:'DPD Pickup Rēzekne',city:'Rēzekne',addr:'Atbrīvošanas aleja 93'},
+  {name:'DPD Pickup Ventspils',city:'Ventspils',addr:'Talsu iela 28'},
+  {name:'DPD Pickup Sigulda',city:'Sigulda',addr:'Pils iela 7'},
+  {name:'DPD Pickup Cēsis',city:'Cēsis',addr:'Raunas iela 1'},
+  {name:'DPD Pickup Ogre',city:'Ogre',addr:'Brīvības iela 12a'},
+  {name:'DPD Pickup Tukums',city:'Tukums',addr:'Talsu iela 19'},
+];
+
+fetch('https://www.omniva.lv/locations.json')
+  .then(function(r){return r.json();})
+  .then(function(d){
+    _omnivaAll = d.filter(function(p){return p.A0_NAME==='LV';})
+      .map(function(p){return {name:p.NAME||'',city:p.A1_NAME||'',addr:p.VISIT_ADDRESS||''};});
+  }).catch(function(){});
+
+document.addEventListener('input', function(e){
+  if (e.target.id === 'deliveryAddrField') daSearch(e.target.value);
+});
+document.addEventListener('focus', function(e){
+  if (e.target.id === 'deliveryAddrField') daSearch(e.target.value);
+}, true);
+document.addEventListener('change', function(e){
+  if (e.target.name !== 'delivery_carrier') return;
+  var isOmn = e.target.value === 'omniva';
+  var ob = document.getElementById('dcb_omniva');
+  var db = document.getElementById('dcb_dpd');
+  if (ob) { ob.style.borderColor=isOmn?'var(--gold)':'var(--grey3)'; ob.style.background=isOmn?'var(--cream2)':'transparent'; ob.style.color=isOmn?'var(--ink)':'var(--grey)'; }
+  if (db) { db.style.borderColor=isOmn?'var(--grey3)':'var(--gold)'; db.style.background=isOmn?'transparent':'var(--cream2)'; db.style.color=isOmn?'var(--grey)':'var(--ink)'; }
+  var hint = document.getElementById('daHint');
+  if (hint) hint.textContent = isOmn ? 'Omniva — raksti pilsētu vai nosāukumu' : 'DPD — raksti pilsētu vai nosāukumu';
+  var f = document.getElementById('deliveryAddrField');
+  if (f) { f.value=''; }
+  daHide();
+});
+document.addEventListener('click', function(e){
+  if (e.target.id!=='deliveryAddrField' && !e.target.closest('#daDropdown')) daHide();
+});
+
+function daSearch(q) {
+  q = (q||'').toLowerCase().trim();
+  var el = document.getElementById('daDropdown');
+  if (!el) return;
+  var dcEl = document.querySelector('input[name="delivery_carrier"]:checked');
+  var dc = dcEl ? dcEl.value : 'omniva';
+  var list = dc==='dpd' ? _dpdAll : _omnivaAll;
+  if (!q || q.length < 1) { daHide(); return; }
+  var res = list.filter(function(p){ return (p.name+p.city+p.addr).toLowerCase().indexOf(q)!==-1; }).slice(0,20);
+  if (!res.length) { daHide(); return; }
+  el.style.display = 'block';
+  el.innerHTML = res.map(function(p){
+    var lbl = p.name + (p.city && p.name.toLowerCase().indexOf(p.city.toLowerCase())===-1 ? ' — '+p.city : '');
+    var v = (p.name+(p.addr?', '+p.addr:'')+(p.city?', '+p.city:'')).replace(/"/g,'&quot;');
+    return '<div data-v="'+v+'" class="dai" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #e8e3da;font-size:13px;color:#1a1a1a;">'
+      +lbl+(p.addr?'<div style="font-size:11px;color:#888;">'+p.addr+'</div>':'')+'</div>';
+  }).join('');
+  el.querySelectorAll('.dai').forEach(function(item){
+    item.addEventListener('mouseenter',function(){this.style.background='#f8f6f1';});
+    item.addEventListener('mouseleave',function(){this.style.background='';});
+    item.addEventListener('click',function(){
+      var f=document.getElementById('deliveryAddrField');
+      if(f) f.value=this.getAttribute('data-v');
+      daHide();
+    });
+  });
+}
+function daHide(){var el=document.getElementById('daDropdown');if(el)el.style.display='none';}
+
 function addPhotoToCart() {
   if (!editorProduct || editorPhotos.length < editorProduct.fotos) return;
-  const _da = document.getElementById('deliveryAddrField');
+  var _da   = document.getElementById('deliveryAddrField');
+  var _dcEl = document.querySelector('input[name="delivery_carrier"]:checked');
+  var _dc   = _dcEl ? _dcEl.value : 'omniva';
   if (_da && !_da.value.trim()) {
     _da.focus(); _da.style.borderColor='var(--gold)';
     showToast('Lūdzu ievadiet piegādes adresi', 'error'); return;
   }
-  const btn        = document.getElementById('orderBtn');
-  const produkts   = editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0);
-  const delivery   = (_da?.value||'').trim();
+  var _daVal = _da ? _da.value.trim() : '';
+  const btn      = document.getElementById('orderBtn');
+  const produkts = editorProduct.title + (editorProduct.izmers ? ' ' + editorProduct.izmers : '') + ' — €' + parseFloat(editorProduct.price).toFixed(0);
   const notesRaw   = document.getElementById('orderNotes').value.trim();
-  const fullNotes  = [notesRaw, delivery ? 'Piegādes adrese: '+delivery : ''].filter(Boolean).join(' | ');
+  const fullNotes  = [notesRaw, _daVal ? _dc.toUpperCase()+': '+_daVal : ''].filter(Boolean).join(' | ');
   const guestEmail = document.getElementById('guestEmailField')?.value.trim()||'';
   const galUrls    = editorPhotos.filter(p=>p.galleryUrl).map(p=>p.galleryUrl);
   const localPhotos= editorPhotos.filter(p=>!p.galleryUrl && p.src.startsWith('data:'));
